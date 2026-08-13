@@ -22,6 +22,18 @@ interface FormData {
 
 const sanitize = (s: string) => s.replace(/[<>"'&]/g, '');
 
+const readFileAsBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
 const Label = ({ children }: { children: React.ReactNode }) => (
   <label className="block text-emerald-500/50 text-xs tracking-widest uppercase mb-2">{children}</label>
 );
@@ -135,24 +147,65 @@ export default function MentorFormSection({ initialEmail = '' }: Props) {
       const doc = generatePDFObject();
       const pdfBase64 = doc.output('datauristring').split(',')[1];
 
+      let resumeContent = '';
+      let resumeName = '';
+      if (form.resume) {
+        try {
+          resumeContent = await readFileAsBase64(form.resume);
+          resumeName = form.resume.name;
+        } catch (e) {
+          console.error('Error reading resume file', e);
+        }
+      }
+
+      let signatureContent = '';
+      let signatureName = '';
+      try {
+        const sigDataUrl = sigRef.current.getCanvas().toDataURL('image/png');
+        signatureContent = sigDataUrl.split(',')[1];
+        signatureName = `${safeName}_Signature_${dateStr}.png`;
+      } catch (e) {
+        console.error('Error reading signature canvas', e);
+      }
+
       // Prepare payload as JSON
       const payload = {
-        ...form,
+        fullName: form.fullName,
+        email: form.email,
+        mobile: form.mobile,
+        linkedin: form.linkedin,
+        designation: form.designation,
+        organization: form.organization,
+        location: form.location,
+        experience: form.experience,
+        sector: form.sector.join(', '),
         expertise: form.expertise.join(', '),
+        mentored: form.mentored,
+        mode: form.mode,
+        engagement: form.engagement,
+        contribute: form.contribute.join(', '),
+        availability: form.availability,
+        consent: form.consent,
         date: today,
         pdfContent: pdfBase64,
-        fileName: `${safeName}_AIIF_Mentor_Form_${dateStr}.pdf`
+        fileName: `${safeName}_AIIF_Mentor_Form_${dateStr}.pdf`,
+        resumeContent: resumeContent,
+        resumeName: resumeName,
+        signatureContent: signatureContent,
+        signatureName: signatureName
       };
+
+      console.log("PAYLOAD_DATA:", JSON.stringify(payload));
 
       // Live Google Apps Script Web App URL
       const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwv5u2uLu8WPIiheRM24_cUSXdDsmDrclrZrdSu5aiwh6hOla5HswW-ZBqdmUqcgJr1/exec';
 
-        await fetch(GOOGLE_SCRIPT_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify(payload)
-        });
+      await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      });
 
       alert('Application submitted successfully to AIIF! Your data has been recorded in Google Sheets and the signed PDF has been uploaded.');
     } catch (err) {
@@ -185,25 +238,70 @@ export default function MentorFormSection({ initialEmail = '' }: Props) {
       } catch (e) { console.error('Logo add error', e); }
     }
 
-    addText('MENTORSHIP AGREEMENT', 16, { bold: true, align: 'center' }); gap(4);
+    addText('MENTORSHIP AGREEMENT', 14, { bold: true, align: 'center' }); gap(4);
     addText('This Mentoring Agreement ("Agreement") is entered at Chennai and executed on ' + today + ' ("Effective Date") by and between:', 9); gap(2);
-    addText('AJK INNOVATION INCUBATOR FOUNDATION (AIIF), a Company incorporated under Section 8 of the Indian Companies Act, having its registered office at AJK College of Arts and Science Campus, Navakkarai, Coimbatore - 641105, Tamil Nadu, represented by its Chief Executive Officer, Mr. Tarun Richard Ajeet (hereinafter referred to as "AIIF").', 9); gap(2);
+    addText('AJK INNOVATION INCUBATOR FOUNDATION (AIIF), a Company incorporated under Section 8 of the Indian Companies Act, having its registered office at AJK College of Arts and Science Campus, Navakkarai, Coimbatore - 641105, Tamil Nadu, represented by its Chief Executive Officer, Mr. Tarun Richard Ajeet (hereinafter referred to as "AIIF" which expression shall unless it be repugnant to the contrary shall include its affiliates, successors and permitted assigns).', 9); gap(2);
     addText('AND', 9, { align: 'center' }); gap(2);
-    addText('Mr/Ms. ' + sanitize(form.fullName) + ', currently working at ' + sanitize(form.organization) + ' as ' + sanitize(form.designation) + ' and currently residing at ' + sanitize(form.location) + ' (the "Mentor").', 9); gap(4);
+    addText('Mr/Ms. ' + sanitize(form.fullName) + ', currently working at ' + sanitize(form.organization) + ' as ' + sanitize(form.designation) + ' and currently residing at ' + sanitize(form.location) + ' (the "Mentor", which term shall include successors and permitted assigns).', 9); gap(2);
+    addText('AIIF and Mentor are hereinafter collectively referred to as the "Parties" and individually referred to as the "Party".', 9); gap(2);
+    addText('WHEREAS, AIIF has been setup as a Section 8 Foundation with the mandate of building a thriving deep technology ("deeptech") and emerging technology ecosystem, bringing startups, corporates, governments, and academia together; to build an incubator that helps early-stage deeptech startups, to build an accelerator that helps startups with market access programs, and to build a global collaborative ecosystem on high technology;', 9); gap(2);
+    addText('WHEREAS, Mr/Ms. ' + sanitize(form.fullName) + ' is an expert in ' + (form.expertise.length > 0 ? form.expertise.map(sanitize).join(', ') : '_____________________') + '. The Mentor has ' + (form.experience || 'several years') + ' of professional experience;', 9); gap(2);
+    addText('WHEREAS, the Mentor has agreed to guide the startups of AIIF in the area of their expertise;', 9); gap(2);
+    addText('WHEREAS, the Parties wish to set forth their mutual understanding with regard to the same vide this non-binding MoU.', 9); gap(4);
 
     const secs = [
-      { t: '1. Purpose and Scope', b: '1.1. Mentor will participate in startup support programs executed by AIIF.\n1.2. Provide guidance to participants through mentoring sessions, presentations, meetings, and evaluations.\n1.3. Providing mentoring sessions totaling ' + sanitize(form.availability) + ' per month, focusing on ' + form.expertise.map(sanitize).join(', ') + '.\n1.4. Services provided ' + (form.mode === 'Hybrid' ? 'remotely or physically' : form.mode === 'Online' ? 'remotely' : 'physically') + '.' },
-      { t: '2. Confidentiality', b: '2.1. "Confidential Information" means any non-public information relating to AIIF, any Founder, or Portfolio Company.\n2.2. Mentor will hold Confidential Information in strictest confidence.' },
-      { t: '3. Term and Termination', b: '3.1. Effective for 2 (Two) Years from the Effective Date, with renewal option.\n3.2. Either Party may terminate with 30 days written notice.' },
-      { t: '4. Compensation', b: '4.1. Mentor services are pro-bono to AIIF.\n4.2. AIIF will not compensate the Mentor.' },
-      { t: '5. Liability', b: '5.1. Neither party liable for special, indirect, or consequential damages.' },
-      { t: '6. Independent Contractor', b: '6.1. Mentor is an independent contractor, not an employee.' },
-      { t: '7. Dispute Resolution', b: '7.1. Disputes settled by Arbitration per Indian Arbitration Act, 1996, in Chennai.' },
-      { t: '8. Promotional Materials', b: "8.1. AIIF may use Mentor's name and likeness in promotional materials." },
+      {
+        t: '1. Purpose and Scope',
+        b: '1.1. Mentor will participate in specific or general startup support programs (pre-incubation, incubation & acceleration) executed by AIIF.\n' +
+           '1.2. In the respective knowledge area of the Mentor, provide guidance and advice to participants enrolled in the AIIF programs (the "Founders") through one or more of the following activities, in addition to being reasonably available to answer questions virtually, in person, or via email:\n' +
+           '1.2.1. Mentor may prepare presentations on session topics to the startups during the Term and be present at agreed-upon sessions.\n' +
+           '1.2.2. Mentor will provide meetings (one-on-one or group) with Founders scheduled by AIIF or Founders at lengths of 30 or 60 minutes, as mutually agreeable.\n' +
+           '1.2.3. Providing one-on-one mentoring sessions with a total of ' + sanitize(form.availability || '[NUMBER OF HOURS]') + ' hours per month, focusing on guidance related to ' + (form.expertise.length > 0 ? form.expertise.map(sanitize).join(', ') : '[DOMAIN]') + '.\n' +
+           '1.2.4. For clauses 1.2.1 & 1.2.2, AIIF will provide the list of startups, and the Mentor shall decide which startup(s) to mentor.\n' +
+           '1.3. The Mentor shall provide services remotely or physically, as convenient.\n' +
+           '1.4. Provide individual evaluations of the Founders participating in each session attended by Mentor.\n' +
+           '1.5. Provide feedback on the AIIF programs to the management team of AIIF.'
+      },
+      {
+        t: '2. Confidentiality',
+        b: '2.1. Definition: "Confidential Information" means any non-public information relating to the business, products, or research of AIIF, any Founder, or Portfolio Company, including technical data, trade secrets, and business plans.\n' +
+           '2.2. Nonuse and Nondisclosure: Mentor will hold Confidential Information in the strictest confidence and will not use it for any purpose other than participation in the program, nor disclose it to any third party without prior written consent.\n' +
+           '2.3. Each Disclosing Party is an express third-party beneficiary, and these obligations shall continue after the termination of this Agreement.'
+      },
+      {
+        t: '3. Term and Termination',
+        b: '3.1. Term: This Agreement shall remain in effect for a period of 2 (Two) Years from the Effective Date, with the option of renewal.\n' +
+           '3.2. Termination: Either Party may terminate this Agreement for no reason upon providing 30 (thirty) days written notice. Either Party may terminate immediately for cause (material breach, insolvency, or unlawful practices).'
+      },
+      {
+        t: '4. Compensation',
+        b: '4.1. The work performed by the Mentor shall be performed pro-bono to AIIF and/or the startup, or on mutually agreed terms directly between the startup and the Mentor.\n' +
+           '4.2. The Mentor acknowledges that AIIF will not be compensating the Mentor.\n' +
+           '4.3. Any billable service rendered by the Mentor to a Startup shall be directly engaged and compensated by the Startup. AIIF shall have no liability or obligation in such engagements.'
+      },
+      {
+        t: '5. Liability',
+        b: '5.1. Neither party shall be liable to the other for any special, indirect, incidental, or consequential damages arising from this agreement, including loss of profits or third-party claims.'
+      },
+      {
+        t: '6. Independent Contractor',
+        b: '6.1. Mentor performs services as an independent contractor; nothing in this Agreement constitutes an employment, agency, or representative relationship.'
+      },
+      {
+        t: '7. Dispute Resolution and Jurisdiction',
+        b: '7.1. Parties agree to first mediate disputes in good faith. If mediation fails, disputes shall be settled by Arbitration in accordance with the Indian Arbitration and Conciliation Act, 1996, held in Chennai (or mutually agreed location) in English.\n' +
+           '7.2. This Agreement is governed by the laws of India, with exclusive jurisdiction in the courts of Chennai/Coimbatore.'
+      },
+      {
+        t: '8. Promotional Materials',
+        b: "8.1. AIIF may use Mentor's name, likeness, and quotes in promotional materials regarding AIIF programs and vice-versa."
+      }
     ];
     secs.forEach(s => { gap(2); addText(s.t, 10, { bold: true }); addText(s.b, 9); });
 
-    gap(10); addText('SIGNATURES', 11, { bold: true, align: 'center' }); gap(6);
+    gap(4);
+    addText('The Parties have read and understood all terms herein and voluntarily sign this Agreement on the date stated above.', 9); gap(4);
+
     addText('For AJK INNOVATION INCUBATOR FOUNDATION (AIIF)', 9, { bold: true }); gap(8);
     addText('____________________________', 9);
     addText('Tarun Richard Ajeet, Chief Executive Officer', 8); gap(8);
@@ -320,17 +418,81 @@ export default function MentorFormSection({ initialEmail = '' }: Props) {
             {step === 2 && (
               <motion.div key="s2" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.3 }} className="grid gap-6">
                 <div className="bg-white/5 border border-emerald-500/10 rounded-2xl p-5 md:p-8 max-h-[420px] overflow-y-auto text-white/60 text-sm leading-relaxed space-y-4">
-                  <h3 className="text-white text-lg font-bold text-center">MENTORSHIP AGREEMENT</h3>
-                  <p>This Agreement is entered at <strong className="text-emerald-400">Chennai</strong> on <strong className="text-emerald-400">{today}</strong> between:</p>
-                  <p><strong className="text-white">AJK INNOVATION INCUBATOR FOUNDATION (AIIF)</strong>, represented by CEO <strong className="text-white">Mr. Tarun Richard Ajeet</strong>.</p>
+                  <h3 className="text-white text-lg font-bold text-center tracking-wide">MENTORSHIP AGREEMENT</h3>
+                  <p>This Mentoring Agreement (“Agreement”) is entered at <strong className="text-emerald-400">Chennai</strong> and executed on <strong className="text-emerald-400">{today}</strong> (“Effective Date”) by and between:</p>
+                  
+                  <p><strong className="text-white">AJK INNOVATION INCUBATOR FOUNDATION (AIIF)</strong>, a Company incorporated under Section 8 of the Indian Companies Act, having its registered office at AJK College of Arts and Science Campus, Navakkarai, Coimbatore - 641105, Tamil Nadu, represented by its Chief Executive Officer, Mr. Tarun Richard Ajeet (hereinafter referred to as “AIIF” which expression shall unless it be repugnant to the contrary shall include its affiliates, successors and permitted assigns).</p>
+                  
                   <p className="text-center font-bold text-white">AND</p>
-                  <p><strong className="text-emerald-400">{form.fullName || '___'}</strong>, working at <strong className="text-emerald-400">{form.organization || '___'}</strong> as <strong className="text-emerald-400">{form.designation || '___'}</strong>, residing at <strong className="text-emerald-400">{form.location || '___'}</strong>.</p>
+                  
+                  <p><strong className="text-emerald-400">Mr/Ms. {form.fullName || '_____________________'}</strong>, currently working at <strong className="text-emerald-400">{form.organization || '_______________________________________'}</strong> as <strong className="text-emerald-400">{form.designation || '______________________________'}</strong> and currently residing at <strong className="text-emerald-400">{form.location || '_______________________________'}</strong> (the “Mentor”, which term shall include successors and permitted assigns).</p>
+                  
+                  <p>AIIF and Mentor are hereinafter collectively referred to as the “Parties” and individually referred to as the “Party”.</p>
+                  
+                  <p><strong>WHEREAS</strong>, AIIF has been setup as a Section 8 Foundation with the mandate of building a thriving deep technology (“deeptech”) and emerging technology ecosystem, bringing startups, corporates, governments, and academia together; to build an incubator that helps early-stage deeptech startups, to build an accelerator that helps startups with market access programs, and to build a global collaborative ecosystem on high technology;</p>
+                  
+                  <p><strong>WHEREAS</strong>, <strong className="text-emerald-400">Mr/Ms. {form.fullName || '_____________________'}</strong> is an expert in <strong className="text-emerald-400">{form.expertise.join(', ') || '_____________________'}</strong>. The Mentor has <strong className="text-emerald-400">{form.experience || 'several years'}</strong> of professional experience;</p>
+                  
+                  <p><strong>WHEREAS</strong>, the Mentor has agreed to guide the startups of AIIF in the area of their expertise;</p>
+                  
+                  <p><strong>WHEREAS</strong>, the Parties wish to set forth their mutual understanding with regard to the same vide this non-binding MoU.</p>
+                  
                   <h4 className="text-white font-bold pt-2">1. Purpose and Scope</h4>
-                  <p>Mentor will participate in AIIF programs, providing <strong className="text-emerald-400">{form.availability || '[HOURS]'}</strong>/month in <strong className="text-emerald-400">{form.expertise.join(', ') || '[DOMAIN]'}</strong>.</p>
-                  <h4 className="text-white font-bold pt-2">2. Confidentiality</h4><p>Mentor will hold all Confidential Information in strictest confidence.</p>
-                  <h4 className="text-white font-bold pt-2">3. Term</h4><p>2 Years, renewable. 30-day notice for termination.</p>
-                  <h4 className="text-white font-bold pt-2">4. Compensation</h4><p>Pro-bono. AIIF will not compensate the Mentor.</p>
-                  <h4 className="text-white font-bold pt-2">5–8. Standard Clauses</h4><p>Liability limitations, independent contractor status, dispute resolution (Chennai), and promotional materials usage per full agreement.</p>
+                  <ul className="list-none space-y-2 pl-4">
+                    <li><strong>1.1.</strong> Mentor will participate in specific or general startup support programs (pre-incubation, incubation & acceleration) executed by AIIF.</li>
+                    <li><strong>1.2.</strong> In the respective knowledge area of the Mentor, provide guidance and advice to participants enrolled in the AIIF programs (the “Founders”) through one or more of the following activities, in addition to being reasonably available to answer questions virtually, in person, or via email:
+                      <ul className="list-none space-y-1 pl-4 mt-1">
+                        <li><strong>1.2.1.</strong> Mentor may prepare presentations on session topics to the startups during the Term and be present at agreed-upon sessions.</li>
+                        <li><strong>1.2.2.</strong> Mentor will provide meetings (one-on-one or group) with Founders scheduled by AIIF or Founders at lengths of 30 or 60 minutes, as mutually agreeable.</li>
+                        <li><strong>1.2.3.</strong> Providing one-on-one mentoring sessions with a total of <strong className="text-emerald-400">{form.availability || '[NUMBER OF HOURS]'}</strong> hours per month, focusing on guidance related to <strong className="text-emerald-400">{form.expertise.join(', ') || '[DOMAIN]'}</strong>.</li>
+                        <li><strong>1.2.4.</strong> For clauses 1.2.1 & 1.2.2, AIIF will provide the list of startups, and the Mentor shall decide which startup(s) to mentor.</li>
+                      </ul>
+                    </li>
+                    <li><strong>1.3.</strong> The Mentor shall provide services remotely or physically, as convenient.</li>
+                    <li><strong>1.4.</strong> Provide individual evaluations of the Founders participating in each session attended by Mentor.</li>
+                    <li><strong>1.5.</strong> Provide feedback on the AIIF programs to the management team of AIIF.</li>
+                  </ul>
+                  
+                  <h4 className="text-white font-bold pt-2">2. Confidentiality</h4>
+                  <ul className="list-none space-y-2 pl-4">
+                    <li><strong>2.1.</strong> Definition: “Confidential Information” means any non-public information relating to the business, products, or research of AIIF, any Founder, or Portfolio Company, including technical data, trade secrets, and business plans.</li>
+                    <li><strong>2.2.</strong> Nonuse and Nondisclosure: Mentor will hold Confidential Information in the strictest confidence and will not use it for any purpose other than participation in the program, nor disclose it to any third party without prior written consent.</li>
+                    <li><strong>2.3.</strong> Each Disclosing Party is an express third-party beneficiary, and these obligations shall continue after the termination of this Agreement.</li>
+                  </ul>
+                  
+                  <h4 className="text-white font-bold pt-2">3. Term and Termination</h4>
+                  <ul className="list-none space-y-2 pl-4">
+                    <li><strong>3.1.</strong> Term: This Agreement shall remain in effect for a period of 2 (Two) Years from the Effective Date, with the option of renewal.</li>
+                    <li><strong>3.2.</strong> Termination: Either Party may terminate this Agreement for no reason upon providing 30 (thirty) days written notice. Either Party may terminate immediately for cause (material breach, insolvency, or unlawful practices).</li>
+                  </ul>
+                  
+                  <h4 className="text-white font-bold pt-2">4. Compensation</h4>
+                  <ul className="list-none space-y-2 pl-4">
+                    <li><strong>4.1.</strong> The work performed by the Mentor shall be performed pro-bono to AIIF and/or the startup, or on mutually agreed terms directly between the startup and the Mentor.</li>
+                    <li><strong>4.2.</strong> The Mentor acknowledges that AIIF will not be compensating the Mentor.</li>
+                    <li><strong>4.3.</strong> Any billable service rendered by the Mentor to a Startup shall be directly engaged and compensated by the Startup. AIIF shall have no liability or obligation in such engagements.</li>
+                  </ul>
+                  
+                  <h4 className="text-white font-bold pt-2">5. Liability</h4>
+                  <ul className="list-none space-y-2 pl-4">
+                    <li><strong>5.1.</strong> Neither party shall be liable to the other for any special, indirect, incidental, or consequential damages arising from this agreement, including loss of profits or third-party claims.</li>
+                  </ul>
+                  
+                  <h4 className="text-white font-bold pt-2">6. Independent Contractor</h4>
+                  <ul className="list-none space-y-2 pl-4">
+                    <li><strong>6.1.</strong> Mentor performs services as an independent contractor; nothing in this Agreement constitutes an employment, agency, or representative relationship.</li>
+                  </ul>
+                  
+                  <h4 className="text-white font-bold pt-2">7. Dispute Resolution and Jurisdiction</h4>
+                  <ul className="list-none space-y-2 pl-4">
+                    <li><strong>7.1.</strong> Parties agree to first mediate disputes in good faith. If mediation fails, disputes shall be settled by Arbitration in accordance with the Indian Arbitration and Conciliation Act, 1996, held in Chennai (or mutually agreed location) in English.</li>
+                    <li><strong>7.2.</strong> This Agreement is governed by the laws of India, with exclusive jurisdiction in the courts of Chennai/Coimbatore.</li>
+                  </ul>
+                  
+                  <h4 className="text-white font-bold pt-2">8. Promotional Materials</h4>
+                  <ul className="list-none space-y-2 pl-4">
+                    <li><strong>8.1.</strong> AIIF may use Mentor's name, likeness, and quotes in promotional materials regarding AIIF programs and vice-versa.</li>
+                  </ul>
                 </div>
                 <div>
                   <Label>Your Signature</Label>
