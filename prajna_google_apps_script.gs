@@ -32,7 +32,7 @@ function doGet() {
     
     if (files.hasNext()) {
       var file = files.next();
-      content = file.getAs("text/plain").getDataAsString();
+      content = file.getBlob().getDataAsString();
     }
     
     return ContentService.createTextOutput(content)
