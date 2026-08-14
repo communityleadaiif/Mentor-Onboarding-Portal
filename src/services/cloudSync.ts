@@ -61,17 +61,21 @@ export const saveCloudSubmissions = async (submissions: FullSubmission[]): Promi
     // Save to local storage cache first
     localStorage.setItem('prajna_2026_user_submissions', JSON.stringify(submissions));
 
+    const isGoogleScript = CLOUD_API_URL.includes('script.google.com');
+    const method = isGoogleScript ? 'POST' : 'PUT';
+    const contentType = isGoogleScript ? 'text/plain' : 'application/json';
+
     const res = await fetch(CLOUD_API_URL, {
-      method: 'PUT',
+      method,
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': contentType
       },
       body: JSON.stringify(submissions)
     });
 
     return res.ok;
   } catch (err) {
-    console.warn('Cloud API save warning:', err);
+    console.error('Cloud API save error:', err);
     return false;
   }
 };
