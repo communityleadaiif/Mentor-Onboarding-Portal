@@ -7,13 +7,58 @@ import { PhotoUploader } from './PhotoUploader';
 import { SDGGridSelector } from './SDGGridSelector';
 import { AIReadinessForm } from './AIReadinessForm';
 import { SubmissionSuccessModal } from './SubmissionSuccessModal';
-import { Send, Save, CheckCircle2, FileText, Sparkles, Building, MapPin } from 'lucide-react';
+import { Send, Save, CheckCircle2, FileText, Sparkles, Building, MapPin, AlertTriangle } from 'lucide-react';
 
 interface SubmissionFormProps {
   onSubmissionComplete: (submission: FullSubmission) => void;
   lang?: Language;
-  onNewSchoolRegistered?: (schoolName: string, district: string) => void;
 }
+
+// Validation Helper Functions
+const validateName = (val: string, fieldLabel: string): string | null => {
+  if (!val || val.trim().length === 0) return `${fieldLabel} is required.`;
+  if (val.trim().length < 2) return `${fieldLabel} must be at least 2 characters.`;
+  const nameRegex = /^[a-zA-Z\s\.\-']+$/;
+  if (!nameRegex.test(val.trim())) return `${fieldLabel} must contain only letters and spaces (no digits or symbols).`;
+  return null;
+};
+
+const validatePhone = (val: string, fieldLabel: string): string | null => {
+  if (!val || val.trim().length === 0) return `${fieldLabel} is required.`;
+  const cleanPhone = val.replace(/[\s\-\+]/g, '').replace(/^91/, '');
+  const phoneRegex = /^[6-9]\d{9}$/;
+  if (!phoneRegex.test(cleanPhone)) return `${fieldLabel} must be a valid 10-digit mobile number starting with 6, 7, 8, or 9.`;
+  return null;
+};
+
+const validateEmail = (val: string, fieldLabel: string): string | null => {
+  if (!val || val.trim().length === 0) return null; // Optional
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(val.trim())) return `Please enter a valid email address for ${fieldLabel}.`;
+  return null;
+};
+
+const validateMinLen = (val: string, min: number, fieldLabel: string): string | null => {
+  if (!val || val.trim().length === 0) return `${fieldLabel} is required.`;
+  if (val.trim().length < min) return `${fieldLabel} must be at least ${min} characters long.`;
+  return null;
+};
+
+const validateCost = (val: string): string | null => {
+  if (!val || val.trim().length === 0) return 'Estimated cost/budget is required.';
+  if (!/\d/.test(val)) return 'Estimated cost must contain numerical digits (e.g. ₹ 4,500 or 4500).';
+  return null;
+};
+
+const FieldError: React.FC<{ error?: string }> = ({ error }) => {
+  if (!error) return null;
+  return (
+    <p className="text-[11px] text-rose-400 font-bold mt-1 flex items-center gap-1">
+      <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+      <span>{error}</span>
+    </p>
+  );
+};
 
 const INITIAL_SUBMISSION: FullSubmission = {
   id: `PRJ-2026-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -104,8 +149,7 @@ const PAYING_STAKEHOLDERS = [
 
 export const SubmissionForm: React.FC<SubmissionFormProps> = ({
   onSubmissionComplete,
-  lang = 'en',
-  onNewSchoolRegistered
+  lang = 'en'
 }) => {
   const t = TRANSLATIONS[lang];
   const [formData, setFormData] = useState<FullSubmission>(() => {
@@ -121,6 +165,17 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [completedSubmission, setCompletedSubmission] = useState<FullSubmission | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [validationSummary, setValidationSummary] = useState<string[]>([]);
+
+  const getInputClass = (fieldName: string) => {
+    const base = "w-full bg-[#1F0000] border rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none transition";
+    if (errors[fieldName]) {
+      return `${base} border-rose-500 bg-rose-950/20 text-rose-100 focus:border-rose-400`;
+    }
+    return `${base} border-[#D4AF37]/30 focus:border-[#FFD700]`;
+  };
 
   const handleSaveDraft = () => {
     try {
@@ -132,16 +187,88 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
+  const markTouched = (field: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
+
+  const validateField = (field: string, value: any): string | null => {
+    switch (field) {
+      case 'schoolName':
+        return validateMinLen(value, 3, 'School Name');
+      case 'teamName':
+        return validateMinLen(value, 3, 'Team Name');
+      case 'teamLeadName':
+        return validateName(value, 'Team Lead Name');
+      case 'teamLeadPhone':
+        return validatePhone(value, 'Team Lead Phone');
+      case 'teamLeadEmail':
+        return validateEmail(value, 'Team Lead Email');
+      case 'member2Name':
+        return validateName(value, '2nd Student Member Name');
+      case 'member3Name':
+        return validateName(value, '3rd Student Member Name');
+      case 'guideTeacherName':
+        return validateName(value, 'Guide Teacher Name');
+      case 'guideTeacherPhone':
+        return validatePhone(value, 'Guide Teacher Phone');
+      case 'guideTeacherEmail':
+        return validateEmail(value, 'Guide Teacher Email');
+      case 'problemTitle':
+        return validateMinLen(value, 5, 'Problem Title');
+      case 'problemLocation':
+        return validateMinLen(value, 3, 'Problem Location');
+      case 'stakeholdersAffected':
+        return validateMinLen(value, 3, 'Stakeholders Affected');
+      case 'whyItMatters':
+        return validateMinLen(value, 15, 'Why It Matters description');
+      case 'solutionSummary':
+        return validateMinLen(value, 20, 'Solution Summary');
+      case 'uniqueness':
+        return validateMinLen(value, 10, 'Uniqueness description');
+      case 'resourcesRequired':
+        return validateMinLen(value, 3, 'Resources Required');
+      case 'estimatedCost':
+        return validateCost(value);
+      case 'estimatedTime':
+        return validateMinLen(value, 2, 'Estimated Time');
+      case 'potentialBeneficiaries':
+        return validateMinLen(value, 10, 'Potential Beneficiaries');
+      default:
+        return null;
+    }
+  };
+
+  const handleBlur = (field: string, value: any) => {
+    markTouched(field);
+    const err = validateField(field, value);
+    setErrors(prev => ({
+      ...prev,
+      [field]: err || ''
+    }));
+  };
+
   const updateTeam = (field: keyof TeamDetails, value: any) => {
     setFormData(prev => ({ ...prev, team: { ...prev.team, [field]: value } }));
+    if (touched[field]) {
+      const err = validateField(field, value);
+      setErrors(prev => ({ ...prev, [field]: err || '' }));
+    }
   };
 
   const updateProblem = (field: keyof ProblemDetails, value: any) => {
     setFormData(prev => ({ ...prev, problem: { ...prev.problem, [field]: value } }));
+    if (touched[field]) {
+      const err = validateField(field, value);
+      setErrors(prev => ({ ...prev, [field]: err || '' }));
+    }
   };
 
   const updateSolution = (field: keyof SolutionFeasibility, value: any) => {
     setFormData(prev => ({ ...prev, solution: { ...prev.solution, [field]: value } }));
+    if (touched[field]) {
+      const err = validateField(field, value);
+      setErrors(prev => ({ ...prev, [field]: err || '' }));
+    }
   };
 
   const togglePayingStakeholder = (stakeholder: string) => {
@@ -159,19 +286,95 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
 
   const updateDeclaration = (field: keyof Declaration, value: boolean) => {
     setFormData(prev => ({ ...prev, declaration: { ...prev.declaration, [field]: value } }));
+    if (errors['declaration']) {
+      setErrors(prev => ({ ...prev, declaration: '' }));
+    }
+  };
+
+  const runFullValidation = (data: FullSubmission) => {
+    const newErrors: Record<string, string> = {};
+    const summary: string[] = [];
+
+    const addErr = (key: string, msg: string | null) => {
+      if (msg) {
+        newErrors[key] = msg;
+        summary.push(msg);
+      }
+    };
+
+    // Section 1
+    addErr('schoolName', validateMinLen(data.team.schoolName, 3, 'School Name'));
+    addErr('teamName', validateMinLen(data.team.teamName, 3, 'Team Name'));
+    addErr('teamLeadName', validateName(data.team.teamLeadName, 'Team Lead Name'));
+    addErr('teamLeadPhone', validatePhone(data.team.teamLeadPhone, 'Team Lead Phone'));
+    if (data.team.teamLeadEmail) addErr('teamLeadEmail', validateEmail(data.team.teamLeadEmail, 'Team Lead Email'));
+    addErr('member2Name', validateName(data.team.member2Name, '2nd Student Member Name'));
+    addErr('member3Name', validateName(data.team.member3Name, '3rd Student Member Name'));
+    addErr('guideTeacherName', validateName(data.team.guideTeacherName, 'Guide Teacher Name'));
+    addErr('guideTeacherPhone', validatePhone(data.team.guideTeacherPhone, 'Guide Teacher Phone'));
+    if (data.team.guideTeacherEmail) addErr('guideTeacherEmail', validateEmail(data.team.guideTeacherEmail, 'Guide Teacher Email'));
+
+    // Section 2
+    addErr('problemTitle', validateMinLen(data.problem.problemTitle, 5, 'Problem Title'));
+    addErr('problemLocation', validateMinLen(data.problem.problemLocation, 3, 'Problem Location'));
+    addErr('stakeholdersAffected', validateMinLen(data.problem.stakeholdersAffected, 3, 'Stakeholders Affected'));
+    addErr('whyItMatters', validateMinLen(data.problem.whyItMatters, 15, 'Why It Matters description'));
+
+    // Section 3: Photos & Duplicate check
+    const p1 = data.problem.photoCloseUp;
+    const p2 = data.problem.photoWideAngle;
+    const p3 = data.problem.photoTeamOnSite;
+
+    if (!p1) addErr('photoCloseUp', 'Section 3: Close-Up Photo is required.');
+    if (!p2) addErr('photoWideAngle', 'Section 3: Wide-Angle Photo is required.');
+    if (!p3) addErr('photoTeamOnSite', 'Section 3: Team On-Site Photo is required.');
+
+    if (p1 && p2 && p3) {
+      if (p1 === p2 || p1 === p3 || p2 === p3) {
+        addErr('photoDuplicate', 'Section 3: All 3 mandatory photos must be distinct. You cannot use duplicate images.');
+      }
+    }
+
+    // Section 4 & 5
+    addErr('solutionSummary', validateMinLen(data.solution.solutionSummary, 20, 'Solution Summary'));
+    addErr('uniqueness', validateMinLen(data.solution.uniqueness, 10, 'Uniqueness description'));
+    addErr('resourcesRequired', validateMinLen(data.solution.resourcesRequired, 3, 'Resources Required'));
+    addErr('estimatedCost', validateCost(data.solution.estimatedCost));
+    addErr('estimatedTime', validateMinLen(data.solution.estimatedTime, 2, 'Estimated Time'));
+    addErr('potentialBeneficiaries', validateMinLen(data.solution.potentialBeneficiaries, 10, 'Potential Beneficiaries'));
+
+    // Section 6
+    if (!data.sdg.selectedSdgs || data.sdg.selectedSdgs.length === 0) {
+      addErr('selectedSdgs', 'Section 6: Select at least 1 Sustainable Development Goal (SDG).');
+    }
+
+    // Section 9
+    const d = data.declaration;
+    if (!d.photoPermission || !d.truthfulInfo || !d.originalIdea || !d.promotionalUse || !d.abideRules) {
+      addErr('declaration', 'Section 9: Please accept and check all 5 items in the Declaration section.');
+    }
+
+    return {
+      isValid: Object.keys(newErrors).length === 0,
+      newErrors,
+      summary
+    };
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const d = formData.declaration;
-    if (!d.photoPermission || !d.truthfulInfo || !d.originalIdea || !d.promotionalUse || !d.abideRules) {
-      alert('⚠️ Please complete and check all 5 items in Section 9 (Declaration) before submitting.');
+    
+    // Validate all fields
+    const valResult = runFullValidation(formData);
+    if (!valResult.isValid) {
+      setErrors(valResult.newErrors);
+      setValidationSummary(valResult.summary);
+      window.scrollTo({ top: 200, behavior: 'smooth' });
       return;
     }
 
-    if (formData.team.schoolName && onNewSchoolRegistered) {
-      onNewSchoolRegistered(formData.team.schoolName, formData.team.schoolDistrict);
-    }
+    setValidationSummary([]);
+    setErrors({});
 
     const gatedSubmission: FullSubmission = {
       ...formData,
@@ -227,6 +430,24 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
         <p className="text-xs sm:text-sm text-amber-100/80 leading-relaxed max-w-3xl">
           Complete the field observation metrics, geotagged problem ownership, feasibility analysis, and 3 mandatory authenticity photos below.
         </p>
+
+        {/* Validation Summary Box */}
+        {validationSummary.length > 0 && (
+          <div className="mt-4 bg-rose-950/90 border-2 border-rose-500 rounded-xl p-4 space-y-2 text-rose-100 shadow-xl">
+            <div className="flex items-center gap-2 text-rose-300 font-bold text-sm">
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+              <span>Please fix the following validation errors ({validationSummary.length}) before submitting:</span>
+            </div>
+            <ul className="list-disc list-inside text-xs space-y-1 pl-2 text-rose-200 font-medium">
+              {validationSummary.slice(0, 5).map((err, idx) => (
+                <li key={idx}>{err}</li>
+              ))}
+              {validationSummary.length > 5 && (
+                <li className="font-bold text-amber-300">...and {validationSummary.length - 5} more issue(s) highlighted below.</li>
+              )}
+            </ul>
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
@@ -252,9 +473,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 required
                 value={formData.team.schoolName}
                 onChange={(e) => updateTeam('schoolName', e.target.value)}
+                onBlur={() => handleBlur('schoolName', formData.team.schoolName)}
                 placeholder="e.g. Govt Higher Secondary School, Udumalpet"
-                className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none focus:border-[#FFD700]"
+                className={getInputClass('schoolName')}
               />
+              <FieldError error={errors['schoolName']} />
             </div>
 
             <div className="space-y-2">
@@ -277,9 +500,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 required
                 value={formData.team.teamName}
                 onChange={(e) => updateTeam('teamName', e.target.value)}
+                onBlur={() => handleBlur('teamName', formData.team.teamName)}
                 placeholder="e.g. Amaravathi Eco Innovators"
-                className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none focus:border-[#FFD700]"
+                className={getInputClass('teamName')}
               />
+              <FieldError error={errors['teamName']} />
             </div>
 
             <div className="space-y-2">
@@ -299,9 +524,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 required
                 value={formData.team.teamLeadName}
                 onChange={(e) => updateTeam('teamLeadName', e.target.value)}
-                placeholder="Student Team Lead Full Name"
-                className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                onBlur={() => handleBlur('teamLeadName', formData.team.teamLeadName)}
+                placeholder="Student Team Lead Full Name (Letters & spaces only)"
+                className={getInputClass('teamLeadName')}
               />
+              <FieldError error={errors['teamLeadName']} />
             </div>
 
             <div className="space-y-2">
@@ -311,9 +538,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 required
                 value={formData.team.teamLeadPhone}
                 onChange={(e) => updateTeam('teamLeadPhone', e.target.value)}
-                placeholder="10-digit WhatsApp Number"
-                className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                onBlur={() => handleBlur('teamLeadPhone', formData.team.teamLeadPhone)}
+                placeholder="10-digit WhatsApp Number (e.g. 9876543210)"
+                className={getInputClass('teamLeadPhone')}
               />
+              <FieldError error={errors['teamLeadPhone']} />
             </div>
 
             <div className="space-y-2">
@@ -322,9 +551,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 type="email"
                 value={formData.team.teamLeadEmail || ''}
                 onChange={(e) => updateTeam('teamLeadEmail', e.target.value)}
+                onBlur={() => handleBlur('teamLeadEmail', formData.team.teamLeadEmail)}
                 placeholder="student@gmail.com"
-                className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                className={getInputClass('teamLeadEmail')}
               />
+              <FieldError error={errors['teamLeadEmail']} />
             </div>
 
             <div className="space-y-2">
@@ -334,9 +565,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 required
                 value={formData.team.member2Name}
                 onChange={(e) => updateTeam('member2Name', e.target.value)}
+                onBlur={() => handleBlur('member2Name', formData.team.member2Name)}
                 placeholder="2nd Student Member Full Name"
-                className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                className={getInputClass('member2Name')}
               />
+              <FieldError error={errors['member2Name']} />
             </div>
 
             <div className="space-y-2">
@@ -346,9 +579,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 required
                 value={formData.team.member3Name}
                 onChange={(e) => updateTeam('member3Name', e.target.value)}
+                onBlur={() => handleBlur('member3Name', formData.team.member3Name)}
                 placeholder="3rd Student Member Full Name"
-                className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                className={getInputClass('member3Name')}
               />
+              <FieldError error={errors['member3Name']} />
             </div>
 
             <div className="space-y-2">
@@ -358,9 +593,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 required
                 value={formData.team.guideTeacherName}
                 onChange={(e) => updateTeam('guideTeacherName', e.target.value)}
+                onBlur={() => handleBlur('guideTeacherName', formData.team.guideTeacherName)}
                 placeholder="Escort / Guide Teacher Full Name"
-                className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                className={getInputClass('guideTeacherName')}
               />
+              <FieldError error={errors['guideTeacherName']} />
             </div>
 
             <div className="space-y-2">
@@ -370,9 +607,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 required
                 value={formData.team.guideTeacherPhone}
                 onChange={(e) => updateTeam('guideTeacherPhone', e.target.value)}
-                placeholder="Teacher Contact Number"
-                className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                onBlur={() => handleBlur('guideTeacherPhone', formData.team.guideTeacherPhone)}
+                placeholder="Teacher Contact Number (10 digits)"
+                className={getInputClass('guideTeacherPhone')}
               />
+              <FieldError error={errors['guideTeacherPhone']} />
             </div>
 
             <div className="space-y-2">
@@ -381,9 +620,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 type="email"
                 value={formData.team.guideTeacherEmail || ''}
                 onChange={(e) => updateTeam('guideTeacherEmail', e.target.value)}
+                onBlur={() => handleBlur('guideTeacherEmail', formData.team.guideTeacherEmail)}
                 placeholder="teacher@school.edu.in"
-                className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                className={getInputClass('guideTeacherEmail')}
               />
+              <FieldError error={errors['guideTeacherEmail']} />
             </div>
           </div>
         </div>
@@ -410,9 +651,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 required
                 value={formData.problem.problemTitle}
                 onChange={(e) => updateProblem('problemTitle', e.target.value)}
+                onBlur={() => handleBlur('problemTitle', formData.problem.problemTitle)}
                 placeholder="e.g. Unfiltered Agricultural Drain Water Seepage in Village Well"
-                className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                className={getInputClass('problemTitle')}
               />
+              <FieldError error={errors['problemTitle']} />
             </div>
 
             <div className="space-y-2">
@@ -422,9 +665,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 required
                 value={formData.problem.problemLocation}
                 onChange={(e) => updateProblem('problemLocation', e.target.value)}
+                onBlur={() => handleBlur('problemLocation', formData.problem.problemLocation)}
                 placeholder="Exact village, street, or campus location (e.g. Main Gate, Kaniyur Village)"
-                className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                className={getInputClass('problemLocation')}
               />
+              <FieldError error={errors['problemLocation']} />
             </div>
 
             <div className="space-y-2">
@@ -453,9 +698,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 required
                 value={formData.problem.stakeholdersAffected}
                 onChange={(e) => updateProblem('stakeholdersAffected', e.target.value)}
+                onBlur={() => handleBlur('stakeholdersAffected', formData.problem.stakeholdersAffected)}
                 placeholder="e.g. 150 farming families, school children, local bus commuters"
-                className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                className={getInputClass('stakeholdersAffected')}
               />
+              <FieldError error={errors['stakeholdersAffected']} />
             </div>
 
             <div className="space-y-2">
@@ -465,21 +712,26 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 rows={3}
                 value={formData.problem.whyItMatters}
                 onChange={(e) => updateProblem('whyItMatters', e.target.value)}
-                placeholder="Explain why this problem needs urgent resolution. What happens if ignored?"
-                className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                onBlur={() => handleBlur('whyItMatters', formData.problem.whyItMatters)}
+                placeholder="Explain why this problem needs urgent resolution. What happens if ignored? (Min 15 characters)"
+                className={getInputClass('whyItMatters')}
               />
+              <FieldError error={errors['whyItMatters']} />
             </div>
           </div>
         </div>
 
         {/* ================= SECTION 3: 3 MANDATORY PHOTOS ================= */}
-        <PhotoUploader
-          photoCloseUp={formData.problem.photoCloseUp || ''}
-          photoWideAngle={formData.problem.photoWideAngle || ''}
-          photoTeamOnSite={formData.problem.photoTeamOnSite || ''}
-          videoUrl={formData.problem.videoUrl || ''}
-          onChange={updateProblem}
-        />
+        <div className="space-y-2">
+          <PhotoUploader
+            photoCloseUp={formData.problem.photoCloseUp || ''}
+            photoWideAngle={formData.problem.photoWideAngle || ''}
+            photoTeamOnSite={formData.problem.photoTeamOnSite || ''}
+            videoUrl={formData.problem.videoUrl || ''}
+            onChange={updateProblem}
+          />
+          <FieldError error={errors['photoCloseUp'] || errors['photoWideAngle'] || errors['photoTeamOnSite'] || errors['photoDuplicate']} />
+        </div>
 
         {/* ================= SECTION 4 & 5: PROPOSED SOLUTION & FEASIBILITY ================= */}
         <div className="bg-[#2A0000] border-2 border-[#D4AF37]/40 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl">
@@ -503,9 +755,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 rows={3}
                 value={formData.solution.solutionSummary}
                 onChange={(e) => updateSolution('solutionSummary', e.target.value)}
-                placeholder="Describe your practical solution, mechanism, or prototype design."
-                className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                onBlur={() => handleBlur('solutionSummary', formData.solution.solutionSummary)}
+                placeholder="Describe your practical solution, mechanism, or prototype design. (Min 20 characters)"
+                className={getInputClass('solutionSummary')}
               />
+              <FieldError error={errors['solutionSummary']} />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -516,9 +770,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                   required
                   value={formData.solution.uniqueness}
                   onChange={(e) => updateSolution('uniqueness', e.target.value)}
-                  placeholder="What makes your approach novel or better than existing methods?"
-                  className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                  onBlur={() => handleBlur('uniqueness', formData.solution.uniqueness)}
+                  placeholder="What makes your approach novel or better than existing methods? (Min 10 chars)"
+                  className={getInputClass('uniqueness')}
                 />
+                <FieldError error={errors['uniqueness']} />
               </div>
 
               <div className="space-y-2">
@@ -528,9 +784,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                   required
                   value={formData.solution.resourcesRequired}
                   onChange={(e) => updateSolution('resourcesRequired', e.target.value)}
+                  onBlur={() => handleBlur('resourcesRequired', formData.solution.resourcesRequired)}
                   placeholder="e.g. PVC Pipes, Solar Sensor, Local Masonry"
-                  className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                  className={getInputClass('resourcesRequired')}
                 />
+                <FieldError error={errors['resourcesRequired']} />
               </div>
 
               <div className="space-y-2">
@@ -540,9 +798,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                   required
                   value={formData.solution.estimatedCost}
                   onChange={(e) => updateSolution('estimatedCost', e.target.value)}
+                  onBlur={() => handleBlur('estimatedCost', formData.solution.estimatedCost)}
                   placeholder="Estimated budget in INR (e.g. ₹ 4,500)"
-                  className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                  className={getInputClass('estimatedCost')}
                 />
+                <FieldError error={errors['estimatedCost']} />
               </div>
 
               <div className="space-y-2">
@@ -552,9 +812,11 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                   required
                   value={formData.solution.estimatedTime}
                   onChange={(e) => updateSolution('estimatedTime', e.target.value)}
+                  onBlur={() => handleBlur('estimatedTime', formData.solution.estimatedTime)}
                   placeholder="e.g. 2 Weeks, 1 Month"
-                  className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+                  className={getInputClass('estimatedTime')}
                 />
+                <FieldError error={errors['estimatedTime']} />
               </div>
             </div>
 
@@ -611,17 +873,27 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
               rows={2}
               value={formData.solution.potentialBeneficiaries}
               onChange={(e) => updateSolution('potentialBeneficiaries', e.target.value)}
-              placeholder="Detail specifically who gains from this solution (local community members, farmers, municipal body, etc.)."
-              className="w-full bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl px-3 py-2.5 text-xs text-white placeholder-amber-100/30 focus:outline-none"
+              onBlur={() => handleBlur('potentialBeneficiaries', formData.solution.potentialBeneficiaries)}
+              placeholder="Detail specifically who gains from this solution (local community members, farmers, municipal body, etc. Min 10 chars)."
+              className={getInputClass('potentialBeneficiaries')}
             />
+            <FieldError error={errors['potentialBeneficiaries']} />
           </div>
         </div>
 
         {/* ================= SECTION 6: SDG GRID SELECTOR ================= */}
-        <SDGGridSelector
-          selectedSdgs={formData.sdg.selectedSdgs}
-          onChange={(selected) => setFormData(prev => ({ ...prev, sdg: { selectedSdgs: selected } }))}
-        />
+        <div className="space-y-2">
+          <SDGGridSelector
+            selectedSdgs={formData.sdg.selectedSdgs}
+            onChange={(selected) => {
+              setFormData(prev => ({ ...prev, sdg: { selectedSdgs: selected } }));
+              if (errors['selectedSdgs']) {
+                setErrors(prev => ({ ...prev, selectedSdgs: '' }));
+              }
+            }}
+          />
+          <FieldError error={errors['selectedSdgs']} />
+        </div>
 
         {/* ================= SECTION 7: AI READINESS FORM ================= */}
         <AIReadinessForm
@@ -712,6 +984,7 @@ export const SubmissionForm: React.FC<SubmissionFormProps> = ({
                 </label>
               </div>
             ))}
+            <FieldError error={errors['declaration']} />
           </div>
 
           {/* Submit Action Button */}

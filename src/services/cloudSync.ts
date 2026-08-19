@@ -1,48 +1,40 @@
 import type { FullSubmission, AuditStatus } from '../types/prajna';
 
-const CLOUD_API_URL = 'https://jsonbin-zeta.vercel.app/api/bins/1Rxxq8C6te';
+const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbyj_EuwoOtaZkJ4E1PEylxsx8yTtuRJZm0r1_CNC3tyY4tKZk47I5ZuhNccEyS2Auqv/exec';
 
 export const fetchCloudSubmissions = async (): Promise<FullSubmission[]> => {
   try {
     const res = await fetch(CLOUD_API_URL, {
       method: 'GET',
+      redirect: 'follow',
       headers: {
-        'Content-Type': 'application/json'
+        'Accept': 'application/json'
       }
     });
 
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    const cloudData = await res.json();
+    const rawText = await res.text();
+    let cloudData: any;
+    try {
+      cloudData = JSON.parse(rawText);
+    } catch (e) {
+      console.warn('Could not parse cloud JSON response:', rawText);
+      cloudData = [];
+    }
     const cloudList = Array.isArray(cloudData) ? cloudData : [];
 
-    // Get any locally stored submissions on this device
-    let localList: FullSubmission[] = [];
-    try {
-      const local = localStorage.getItem('prajna_2026_user_submissions');
-      localList = local ? JSON.parse(local) : [];
-    } catch (e) {
-      localList = [];
-    }
-
     // Filter out placeholder/test objects that aren't valid submissions
-    const isValidSubmission = (s: any) => s && s.id && s.team && typeof s.team === 'object';
+    const isValidSubmission = (s: any) =>
+      s &&
+      typeof s === 'object' &&
+      typeof s.id === 'string' &&
+      s.team &&
+      typeof s.team === 'object' &&
+      s.problem &&
+      typeof s.problem === 'object';
     const cleanCloudList = cloudList.filter(isValidSubmission);
-    const cleanLocalList = localList.filter(isValidSubmission);
 
-    // Find local submissions that are not in the cloud list
-    const missingInCloud = cleanLocalList.filter(localSub => 
-      !cleanCloudList.some(cloudSub => cloudSub.id === localSub.id)
-    );
-
-    if (missingInCloud.length > 0) {
-      // Merge local into cloud list
-      const mergedList = [...missingInCloud, ...cleanCloudList];
-      // Save the merged list back to the cloud database
-      await saveCloudSubmissions(mergedList);
-      return mergedList;
-    }
-
-    // If no missing, synchronize local storage to match cloud
+    // Synchronize local storage cache to match canonical cloud database
     localStorage.setItem('prajna_2026_user_submissions', JSON.stringify(cleanCloudList));
     return cleanCloudList;
   } catch (err) {
@@ -67,6 +59,7 @@ export const saveCloudSubmissions = async (submissions: FullSubmission[]): Promi
 
     const res = await fetch(CLOUD_API_URL, {
       method,
+      redirect: 'follow',
       headers: {
         'Content-Type': contentType
       },
@@ -133,12 +126,51 @@ export const updateSubmissionAuditStatus = async (
 
 export const deleteSubmissionFromCloud = async (submissionId: string): Promise<FullSubmission[]> => {
   try {
-    const currentList = await fetchCloudSubmissions();
+    let currentList = await fetchCloudSubmissions();
     const updatedList = currentList.filter(s => s.id !== submissionId);
-    await saveCloudSubmissions(updatedList);
+
+    // Save updated local storage cache immediately
+    localStorage.setItem('prajna_2026_user_submissions', JSON.stringify(updatedList));
+
+    // Send explicit tombstone delete action to Google Apps Script
+    await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: {
+        'Content-Type': 'text/plain'
+      },
+      body: JSON.stringify({
+        action: 'delete',
+        id: submissionId
+      })
+    });
+
     return updatedList;
   } catch (err) {
     console.error('Error deleting submission from cloud:', err);
     return [];
+  }
+};
+
+export const clearAllCloudSubmissions = async (): Promise<boolean> => {
+  try {
+    localStorage.removeItem('prajna_2026_user_submissions');
+    localStorage.removeItem('prajna_2026_draft');
+
+    const res = await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: {
+        'Content-Type': 'text/plain'
+      },
+      body: JSON.stringify({
+        action: 'clear_all'
+      })
+    });
+
+    return res.ok;
+  } catch (err) {
+    console.error('Error clearing cloud submissions:', err);
+    return false;
   }
 };

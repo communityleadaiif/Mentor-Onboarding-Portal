@@ -21,7 +21,7 @@ import {
   addCloudSubmission,
   updateSubmissionAuditStatus,
   deleteSubmissionFromCloud,
-  saveCloudSubmissions
+  clearAllCloudSubmissions
 } from './services/cloudSync';
 
 function App() {
@@ -51,7 +51,7 @@ function App() {
   useEffect(() => {
     // Initial fetch on site load
     fetchCloudSubmissions().then(list => {
-      if (list && list.length > 0) {
+      if (list && Array.isArray(list)) {
         setUserSubmittedList(list);
       }
     });
@@ -84,41 +84,32 @@ function App() {
     }
   }, []);
 
-  // Update school marquee list dynamically from approved (VERIFIED) submissions only
+  // Update school marquee list dynamically from approved (VERIFIED) submissions strictly from cloud sheet
   useEffect(() => {
     const verifiedSubs = userSubmittedList.filter(s => s.auditInfo?.status === 'VERIFIED');
-    verifiedSubs.forEach(s => {
-      if (s.team.schoolName) {
-        const exists = schools.some(sc => sc.name.toLowerCase() === s.team.schoolName.toLowerCase());
-        if (!exists) {
-          setSchools(prev => [
-            {
-              id: `sch-${Date.now()}`,
-              name: s.team.schoolName,
-              district: s.team.schoolDistrict || 'Tamil Nadu',
-              badgeSymbol: '🎓',
-              category: 'Registered School'
-            },
-            ...prev
-          ]);
-        }
+    
+    // Map verified submissions to school entries
+    const verifiedSchoolEntries: SchoolEntry[] = verifiedSubs
+      .filter(s => Boolean(s.team && s.team.schoolName))
+      .map((s, idx) => ({
+        id: `verified-sch-${s.id}-${idx}`,
+        name: s.team.schoolName,
+        district: s.team.schoolDistrict || 'Tamil Nadu',
+        badgeSymbol: '🎓',
+        category: 'Approved Finalist School'
+      }));
+
+    // Merge with initial partner schools without duplicates
+    const combined = [...verifiedSchoolEntries];
+    INITIAL_SCHOOLS.forEach(initSch => {
+      const exists = combined.some(c => c.name.toLowerCase() === initSch.name.toLowerCase());
+      if (!exists) {
+        combined.push(initSch);
       }
     });
-  }, [userSubmittedList]);
 
-  const handleNewSchoolRegistered = (schoolName: string, district: string) => {
-    const exists = schools.some(s => s.name.toLowerCase() === schoolName.toLowerCase());
-    if (!exists) {
-      const newEntry: SchoolEntry = {
-        id: `sch-${Date.now()}`,
-        name: schoolName,
-        district: district || 'Tamil Nadu',
-        badgeSymbol: '🎓',
-        category: 'Registered School'
-      };
-      setSchools(prev => [newEntry, ...prev]);
-    }
-  };
+    setSchools(combined);
+  }, [userSubmittedList]);
 
   const handleSubmissionComplete = async (submission: FullSubmission) => {
     const gatedSubmission: FullSubmission = {
@@ -169,9 +160,7 @@ function App() {
   };
 
   const handleClearAllStorage = async () => {
-    localStorage.removeItem('prajna_2026_user_submissions');
-    localStorage.removeItem('prajna_2026_draft');
-    await saveCloudSubmissions([]);
+    await clearAllCloudSubmissions();
     setUserSubmittedList([]);
     setCurrentSubmission(null);
     alert('All cloud database records & local browser cache have been cleared.');
@@ -182,7 +171,11 @@ function App() {
       {/* Header Bar */}
       <HeaderNav
         activeTab={activeTab as any}
-        setActiveTab={setActiveTab as any}
+        setActiveTab={(t) => {
+          setIsIntroVideoOpen(false);
+          setActiveTab(t);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
         hasSubmission={Boolean(currentSubmission)}
         lang={lang}
         onLanguageToggle={setLang}
@@ -200,7 +193,11 @@ function App() {
         {activeTab === 'overview' && (
           <div>
             <HeroBanner
-              onStartClick={() => setActiveTab('submit')}
+              onStartClick={() => {
+                setIsIntroVideoOpen(false);
+                setActiveTab('submit');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               onRulesClick={() => {
                 const el = document.getElementById('guidelines-anchor');
                 el?.scrollIntoView({ behavior: 'smooth' });
@@ -209,13 +206,17 @@ function App() {
               schools={schools}
             />
 
-            {/* Principal Welcome Video Address */}
+            {/* Sainik - A Way of Life Video Section */}
             <div id="principal-video-anchor">
               <PrincipalVideoSection />
             </div>
 
             <div id="guidelines-anchor">
-              <GuidelinesSection onGoToForm={() => setActiveTab('submit')} />
+              <GuidelinesSection onGoToForm={() => {
+                setIsIntroVideoOpen(false);
+                setActiveTab('submit');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }} />
             </div>
           </div>
         )}
@@ -224,7 +225,6 @@ function App() {
           <SubmissionForm
             onSubmissionComplete={handleSubmissionComplete}
             lang={lang}
-            onNewSchoolRegistered={handleNewSchoolRegistered}
           />
         )}
 
@@ -288,8 +288,16 @@ function App() {
 
       {/* Prajna Footer */}
       <PrajnaFooter
-        onOpenJuryLogin={() => setActiveTab('jury')}
-        onOpenOrganiserDesk={() => setActiveTab('organiser')}
+        onOpenJuryLogin={() => {
+          setIsIntroVideoOpen(false);
+          setActiveTab('jury');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOpenOrganiserDesk={() => {
+          setIsIntroVideoOpen(false);
+          setActiveTab('organiser');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
       />
     </div>
   );

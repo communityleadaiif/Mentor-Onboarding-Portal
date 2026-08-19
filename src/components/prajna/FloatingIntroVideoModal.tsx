@@ -7,16 +7,14 @@ interface FloatingIntroVideoModalProps {
 }
 
 export const FloatingIntroVideoModal: React.FC<FloatingIntroVideoModalProps> = ({ isOpen, onClose }) => {
-  const [useLocalVideo, setUseLocalVideo] = useState(true);
-  const [isPlayingYoutube, setIsPlayingYoutube] = useState(false);
+  const [isPlayingYoutube, setIsPlayingYoutube] = useState(true);
 
   if (!isOpen) return null;
 
-  const videoId = 'oqr6OYyahQI';
+  const videoId = 'waN74nb0r6A';
   const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
   const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1`;
   const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-  const localVideoPath = '/video/principal_address.mp4';
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn">
@@ -36,7 +34,7 @@ export const FloatingIntroVideoModal: React.FC<FloatingIntroVideoModalProps> = (
                 SAINIK SCHOOL AMARAVATHINAGAR
               </span>
               <h3 className="text-lg sm:text-xl font-black font-serif text-white mt-0.5">
-                Principal's Official Welcome Address
+                Sainik - A Way of Life
               </h3>
             </div>
           </div>
@@ -54,24 +52,10 @@ export const FloatingIntroVideoModal: React.FC<FloatingIntroVideoModalProps> = (
 
         {/* Video Player Box */}
         <div className="relative w-full pb-[56.25%] h-0 rounded-2xl overflow-hidden bg-black shadow-2xl border-2 border-[#D4AF37]/40 z-10">
-          {useLocalVideo ? (
-            <video
-              controls
-              autoPlay
-              poster={thumbnailUrl}
-              onError={() => {
-                // If local MP4 is not found in public/video/principal_address.mp4, fallback to YouTube embed / trigger
-                setUseLocalVideo(false);
-              }}
-              className="absolute top-0 left-0 w-full h-full object-contain rounded-2xl"
-            >
-              <source src={localVideoPath} type="video/mp4" />
-              Your browser does not support HTML5 video.
-            </video>
-          ) : isPlayingYoutube ? (
+          {isPlayingYoutube ? (
             <iframe
               src={embedUrl}
-              title="Sainik School Amaravathinagar Principal Address - PRAJNA 2026"
+              title="Sainik - A Way of Life - Sainik School Amaravathinagar"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
               className="absolute top-0 left-0 w-full h-full border-0 rounded-2xl"
@@ -84,7 +68,7 @@ export const FloatingIntroVideoModal: React.FC<FloatingIntroVideoModalProps> = (
               {/* Thumbnail Background Image */}
               <img
                 src={thumbnailUrl}
-                alt="Principal Address Poster"
+                alt="Sainik - A Way of Life Poster"
                 className="absolute top-0 left-0 w-full h-full object-cover transition-transform duration-700 group-hover/poster:scale-105 opacity-85"
               />
 

@@ -2,13 +2,11 @@ import React, { useState } from 'react';
 import { ShieldCheck, Award, Play, ExternalLink, RefreshCw } from 'lucide-react';
 
 export const PrincipalVideoSection: React.FC = () => {
-  const [useLocalVideo, setUseLocalVideo] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
-  const videoId = 'oqr6OYyahQI';
+  const videoId = 'waN74nb0r6A';
   const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
   const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1`;
   const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-  const localVideoPath = '/video/principal_address.mp4';
 
   return (
     <section className="py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#1F0000] via-[#2A0000] to-[#1A0000] text-white border-b border-[#D4AF37]/30 relative overflow-hidden">
@@ -20,14 +18,14 @@ export const PrincipalVideoSection: React.FC = () => {
         <div className="text-center space-y-3">
           <div className="inline-flex items-center gap-2 bg-[#8B0000] text-[#FFD700] border border-[#D4AF37]/40 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-md">
             <ShieldCheck className="w-4 h-4 text-[#FFD700]" />
-            <span>Sainik School Amaravathinagar Leadership Message</span>
+            <span>Sainik School Amaravathinagar Presentation</span>
           </div>
 
           <h2 className="text-3xl sm:text-4xl font-extrabold font-serif text-white tracking-tight">
-            Principal's Welcome Address & Invitation
+            Sainik - A Way of Life
           </h2>
           <p className="text-amber-200/80 text-sm max-w-2xl mx-auto leading-relaxed">
-            Listen to the official message from the Principal of Sainik School Amaravathinagar, welcoming schools, students, mentors, and alumni to PRAJNA 2026.
+            Experience the ethos, discipline, and spirit of Sainik School Amaravathinagar — welcoming schools, students, mentors, and alumni to PRAJNA 2026.
           </p>
         </div>
 
@@ -41,24 +39,10 @@ export const PrincipalVideoSection: React.FC = () => {
 
           {/* 16:9 In-Page Video Player Frame */}
           <div className="relative w-full pb-[56.25%] h-0 rounded-2xl overflow-hidden bg-black shadow-inner border border-[#D4AF37]/40">
-            {useLocalVideo ? (
-              <video
-                controls
-                autoPlay={false}
-                poster={thumbnailUrl}
-                onError={() => {
-                  // Fallback to iframe if local video file isn't present in /public/video/principal_address.mp4
-                  setUseLocalVideo(false);
-                }}
-                className="absolute top-0 left-0 w-full h-full object-contain rounded-2xl z-10"
-              >
-                <source src={localVideoPath} type="video/mp4" />
-                Your browser does not support HTML5 video.
-              </video>
-            ) : isPlaying ? (
+            {isPlaying ? (
               <iframe
                 src={embedUrl}
-                title="Sainik School Amaravathinagar Principal Address - PRAJNA 2026"
+                title="Sainik - A Way of Life - Sainik School Amaravathinagar"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
                 className="absolute top-0 left-0 w-full h-full border-0 rounded-2xl z-10"
@@ -71,7 +55,7 @@ export const PrincipalVideoSection: React.FC = () => {
                 {/* Thumbnail Background Image */}
                 <img
                   src={thumbnailUrl}
-                  alt="Sainik School Amaravathinagar Principal Address - PRAJNA 2026"
+                  alt="Sainik - A Way of Life - Sainik School Amaravathinagar"
                   className="absolute top-0 left-0 w-full h-full object-cover transition-transform duration-700 group-hover/poster:scale-105 opacity-85"
                 />
 
@@ -108,7 +92,7 @@ export const PrincipalVideoSection: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
-              {!useLocalVideo && isPlaying && (
+              {isPlaying && (
                 <button
                   onClick={() => setIsPlaying(false)}
                   className="inline-flex items-center gap-1.5 bg-[#1F0000] hover:bg-[#3D0000] text-amber-200 px-3 py-1.5 rounded-lg text-xs font-bold border border-[#D4AF37]/40 transition"

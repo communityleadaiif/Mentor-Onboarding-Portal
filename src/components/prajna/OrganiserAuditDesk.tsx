@@ -20,19 +20,37 @@ export const OrganiserAuditDesk: React.FC<OrganiserAuditDeskProps> = ({
   onSelectSubmissionView
 }) => {
   const [passcode, setPasscode] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    try {
+      return sessionStorage.getItem('prajna_organiser_auth') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'flagged' | 'PENDING_APPROVAL' | 'VERIFIED' | 'REVISION_REQUESTED' | 'REJECTED'>('all');
   const [activeRemarkId, setActiveRemarkId] = useState<string | null>(null);
   const [remarkInput, setRemarkInput] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const allSubmissions = userSubmissions;
+  const allSubmissions = (userSubmissions || []).filter(s => s && s.id && s.team && s.problem);
   const pendingCount = allSubmissions.filter(s => (s.auditInfo?.status || 'PENDING_APPROVAL') === 'PENDING_APPROVAL').length;
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passcode === 'ORGANISER2026' || passcode === 'PRAJNA2026' || passcode === 'admin') {
+    const cleanPasscode = passcode.trim().toUpperCase();
+    if (
+      cleanPasscode === 'ORGANISER2026' ||
+      cleanPasscode === 'PRAJNA2026' ||
+      cleanPasscode === 'ADMIN' ||
+      cleanPasscode === 'ORGANISER' ||
+      cleanPasscode === 'PRAJNA'
+    ) {
+      try {
+        sessionStorage.setItem('prajna_organiser_auth', 'true');
+      } catch (e) {
+        console.warn('SessionStorage warning:', e);
+      }
       setIsAuthenticated(true);
     } else {
       alert('Invalid Organiser Passcode. Please contact Team Prajna Secretariat.');
@@ -49,13 +67,19 @@ export const OrganiserAuditDesk: React.FC<OrganiserAuditDeskProps> = ({
 
   // Automatic Duplicate Idea Scanner
   const checkForDuplicates = (sub: FullSubmission) => {
-    const title = sub.problem.problemTitle.toLowerCase();
-    const matches = allSubmissions.filter(s => s.id !== sub.id && s.problem.problemTitle.toLowerCase().includes(title.substring(0, 15)));
+    const title = sub?.problem?.problemTitle?.toLowerCase() || '';
+    if (!title || title.length < 5) return null;
+    const matches = allSubmissions.filter(s =>
+      s && s.id && s.id !== sub.id &&
+      s.problem?.problemTitle &&
+      s.problem.problemTitle.toLowerCase().includes(title.substring(0, 15))
+    );
     return matches.length > 0 ? matches[0] : null;
   };
 
   // Photo Completeness Check
   const getPhotoAudit = (sub: FullSubmission) => {
+    if (!sub || !sub.problem) return { count: 0, complete: false };
     const photos = [sub.problem.photoCloseUp, sub.problem.photoWideAngle, sub.problem.photoTeamOnSite].filter(Boolean);
     return {
       count: photos.length,
@@ -64,11 +88,18 @@ export const OrganiserAuditDesk: React.FC<OrganiserAuditDeskProps> = ({
   };
 
   const filteredSubmissions = allSubmissions.filter(sub => {
+    if (!sub || !sub.id) return false;
+    const teamName = sub.team?.teamName || '';
+    const schoolName = sub.team?.schoolName || '';
+    const problemTitle = sub.problem?.problemTitle || '';
+    const id = sub.id || '';
+
+    const q = searchQuery.toLowerCase();
     const textMatch =
-      sub.team.teamName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sub.team.schoolName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sub.problem.problemTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sub.id.toLowerCase().includes(searchQuery.toLowerCase());
+      teamName.toLowerCase().includes(q) ||
+      schoolName.toLowerCase().includes(q) ||
+      problemTitle.toLowerCase().includes(q) ||
+      id.toLowerCase().includes(q);
 
     if (!textMatch) return false;
 
@@ -103,7 +134,7 @@ export const OrganiserAuditDesk: React.FC<OrganiserAuditDeskProps> = ({
                 type="password"
                 value={passcode}
                 onChange={e => setPasscode(e.target.value)}
-                placeholder="Enter Passcode (ORGANISER2026)"
+                placeholder="Enter Organiser Passcode"
                 className="w-full bg-[#1F0000] border border-[#D4AF37]/40 rounded-xl px-4 py-3 text-sm text-white placeholder-amber-100/30 focus:outline-none focus:border-[#FFD700]"
               />
             </div>
@@ -164,7 +195,12 @@ export const OrganiserAuditDesk: React.FC<OrganiserAuditDeskProps> = ({
           )}
 
           <button
-            onClick={() => setIsAuthenticated(false)}
+            onClick={() => {
+              try {
+                sessionStorage.removeItem('prajna_organiser_auth');
+              } catch (e) {}
+              setIsAuthenticated(false);
+            }}
             className="text-xs text-amber-200/70 hover:text-white bg-[#1F0000] px-3 py-1.5 rounded-lg border border-[#D4AF37]/30 font-mono"
           >
             Lock Desk
@@ -254,11 +290,11 @@ export const OrganiserAuditDesk: React.FC<OrganiserAuditDeskProps> = ({
                       <span className="font-mono text-xs font-bold text-[#FFD700] bg-[#1F0000] px-2 py-0.5 rounded border border-[#D4AF37]/30">
                         {sub.id}
                       </span>
-                      <h3 className="font-bold text-white text-base font-serif">{sub.team.teamName}</h3>
-                      <span className="text-xs text-amber-200/70">• {sub.team.schoolName} ({sub.team.schoolDistrict})</span>
+                      <h3 className="font-bold text-white text-base font-serif">{sub.team?.teamName || 'Untitled Team'}</h3>
+                      <span className="text-xs text-amber-200/70">• {sub.team?.schoolName || 'School N/A'} ({sub.team?.schoolDistrict || 'District N/A'})</span>
                     </div>
                     <p className="text-xs text-amber-100/70 mt-1">
-                      Team Lead: <strong className="text-white">{sub.team.teamLeadName}</strong> (Ph: {sub.team.teamLeadPhone}) | Guide: {sub.team.guideTeacherName}
+                      Team Lead: <strong className="text-white">{sub.team?.teamLeadName || 'N/A'}</strong> (Ph: {sub.team?.teamLeadPhone || 'N/A'}) | Guide: {sub.team?.guideTeacherName || 'N/A'}
                     </p>
                   </div>
 
@@ -294,10 +330,10 @@ export const OrganiserAuditDesk: React.FC<OrganiserAuditDeskProps> = ({
                 <div className="space-y-2 text-xs">
                   <div>
                     <span className="font-bold text-amber-200">Problem Title:</span>{' '}
-                    <strong className="text-white font-bold text-sm">{sub.problem.problemTitle}</strong>
+                    <strong className="text-white font-bold text-sm">{sub.problem?.problemTitle || 'Untitled Problem'}</strong>
                   </div>
                   <div>
-                    <span className="font-bold text-amber-200">Location & Govt Dept:</span> {sub.problem.problemLocation} • <span className="bg-[#8B0000] text-[#FFD700] px-1.5 py-0.5 rounded font-bold">{sub.problem.responsibleDept}</span>
+                    <span className="font-bold text-amber-200">Location & Govt Dept:</span> {sub.problem?.problemLocation || 'N/A'} • <span className="bg-[#8B0000] text-[#FFD700] px-1.5 py-0.5 rounded font-bold">{sub.problem?.responsibleDept || 'N/A'}</span>
                   </div>
                 </div>
 

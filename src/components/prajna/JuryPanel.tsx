@@ -8,11 +8,17 @@ interface JuryPanelProps {
 
 export const JuryPanel: React.FC<JuryPanelProps> = ({ userSubmissions }) => {
   const [viewMode, setViewMode] = useState<'leaderboard' | 'login'>('leaderboard');
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('prajna_jury_auth') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
   const [passcode, setPasscode] = useState<string>('');
   const [passcodeError, setPasscodeError] = useState<boolean>(false);
 
-  const allSubmissions = userSubmissions;
+  const allSubmissions = userSubmissions.filter(s => s.auditInfo?.status === 'VERIFIED');
   const [selectedSub, setSelectedSub] = useState<FullSubmission | null>(allSubmissions.length > 0 ? allSubmissions[0] : null);
 
   // Interactive Jury Scoring State
@@ -36,7 +42,17 @@ export const JuryPanel: React.FC<JuryPanelProps> = ({ userSubmissions }) => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passcode.trim() === 'PRAJNA2026' || passcode.trim() === 'JURY123' || passcode.trim() === 'admin') {
+    const clean = passcode.trim().toUpperCase();
+    if (
+      clean === 'PRAJNA2026' ||
+      clean === 'JURY123' ||
+      clean === 'ADMIN' ||
+      clean === 'JURY' ||
+      clean === 'PRAJNA'
+    ) {
+      try {
+        sessionStorage.setItem('prajna_jury_auth', 'true');
+      } catch (e) {}
       setIsAuthenticated(true);
       setPasscodeError(false);
     } else {
@@ -180,11 +196,11 @@ export const JuryPanel: React.FC<JuryPanelProps> = ({ userSubmissions }) => {
                     type="password"
                     value={passcode}
                     onChange={(e) => setPasscode(e.target.value)}
-                    placeholder="Enter Passcode (PRAJNA2026)"
+                    placeholder="Enter Evaluator Passcode"
                     className="w-full bg-[#1F0000] border border-[#D4AF37]/40 rounded-xl px-4 py-3 text-sm text-white placeholder-amber-100/30 focus:outline-none focus:border-[#FFD700]"
                   />
                   {passcodeError && (
-                    <p className="text-xs text-rose-400 mt-1">Incorrect Passcode. Try PRAJNA2026</p>
+                    <p className="text-xs text-rose-400 mt-1">Incorrect Passcode. Please check with event anchors.</p>
                   )}
                 </div>
 

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import type { Language } from '../../data/translations';
 import { TRANSLATIONS } from '../../data/translations';
-import { Sparkles, Send, Award, Users, BookOpen, Clock, MapPin, HelpCircle, Globe2, PlayCircle } from 'lucide-react';
+import { Sparkles, Send, Award, Users, BookOpen, Clock, MapPin, HelpCircle, Globe2, PlayCircle, ShieldCheck } from 'lucide-react';
 
 interface HeaderNavProps {
-  activeTab: 'overview' | 'submit' | 'scorecard' | 'gallery' | 'map' | 'jury' | 'faq';
-  setActiveTab: (tab: 'overview' | 'submit' | 'scorecard' | 'gallery' | 'map' | 'jury' | 'faq') => void;
+  activeTab: 'overview' | 'submit' | 'scorecard' | 'gallery' | 'map' | 'jury' | 'faq' | 'organiser';
+  setActiveTab: (tab: 'overview' | 'submit' | 'scorecard' | 'gallery' | 'map' | 'jury' | 'faq' | 'organiser') => void;
   hasSubmission: boolean;
   lang: Language;
   onLanguageToggle: (lang: Language) => void;
@@ -26,7 +26,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
   });
 
   useEffect(() => {
-    const targetDate = new Date('2026-08-15T23:59:59').getTime();
+    const targetDate = new Date('2026-09-03T22:00:00').getTime();
     const updateTimer = () => {
       const now = new Date().getTime();
       const diff = targetDate - now;
@@ -186,6 +186,17 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
             <HelpCircle className="w-3.5 h-3.5" />
             {t.navFAQ}
           </button>
+
+          <button
+            onClick={() => setActiveTab('organiser')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              activeTab === 'organiser' ? 'bg-[#8B0000] text-[#FFD700] border border-[#D4AF37]/50 shadow' : 'text-amber-200/90 hover:text-[#FFD700]'
+            }`}
+            title="Official Organiser Audit Access"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-[#FFD700]" />
+            <span>Organiser Desk</span>
+          </button>
         </nav>
 
         {/* CTA Button */}
@@ -249,6 +260,14 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
           }`}
         >
           {t.navFAQ}
+        </button>
+        <button
+          onClick={() => setActiveTab('organiser')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition ${
+            activeTab === 'organiser' ? 'bg-[#8B0000] text-[#FFD700] border border-[#D4AF37]/40' : 'text-amber-200/90'
+          }`}
+        >
+          🛡️ Organiser
         </button>
       </div>
     </header>

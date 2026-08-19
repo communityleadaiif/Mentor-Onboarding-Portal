@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { Camera, Upload, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Camera, Upload, CheckCircle, AlertCircle, Trash2, AlertTriangle } from 'lucide-react';
 
 interface PhotoUploaderProps {
   photoCloseUp: string;
@@ -18,9 +18,30 @@ export const PhotoUploader: React.FC<PhotoUploaderProps> = ({
   const closeUpInputRef = useRef<HTMLInputElement>(null);
   const wideAngleInputRef = useRef<HTMLInputElement>(null);
   const teamInputRef = useRef<HTMLInputElement>(null);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
+
+  // Check if photos are identical (string match or data payload comparison)
+  const isDuplicateWithExisting = (newDataUrl: string, targetFieldName: string): boolean => {
+    const existingPhotos: Record<string, string> = {
+      photoCloseUp,
+      photoWideAngle,
+      photoTeamOnSite
+    };
+
+    for (const [key, val] of Object.entries(existingPhotos)) {
+      if (key !== targetFieldName && val) {
+        // Direct string match or base64 data comparison
+        if (val === newDataUrl) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
 
   // Client-side Canvas Image Compressor (Reduces 10MB phone camera photos to ~100KB JPEGs)
   const compressAndProcessPhoto = (file: File, fieldName: string) => {
+    setDuplicateError(null);
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
@@ -48,6 +69,12 @@ export const PhotoUploader: React.FC<PhotoUploaderProps> = ({
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
           const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+
+          if (isDuplicateWithExisting(compressedDataUrl, fieldName)) {
+            setDuplicateError('⚠️ Duplicate Image Detected: This photo is identical to another uploaded photo. Each of the 3 photos must be distinct.');
+            return;
+          }
+
           onChange(fieldName, compressedDataUrl);
         }
       };
@@ -60,13 +87,31 @@ export const PhotoUploader: React.FC<PhotoUploaderProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       compressAndProcessPhoto(file, fieldName);
+      // Reset input value so re-selecting same file triggers onChange
+      e.target.value = '';
     }
   };
 
-  const isAllPhotosUploaded = Boolean(photoCloseUp && photoWideAngle && photoTeamOnSite);
+  const hasDuplicatePhotos = Boolean(
+    (photoCloseUp && photoWideAngle && photoCloseUp === photoWideAngle) ||
+    (photoCloseUp && photoTeamOnSite && photoCloseUp === photoTeamOnSite) ||
+    (photoWideAngle && photoTeamOnSite && photoWideAngle === photoTeamOnSite)
+  );
+
+  const isAllPhotosUploaded = Boolean(photoCloseUp && photoWideAngle && photoTeamOnSite && !hasDuplicatePhotos);
 
   return (
     <div className="bg-[#2A0000] border-2 border-[#D4AF37]/40 rounded-2xl p-6 space-y-6 shadow-xl">
+      {/* Duplicate Photo Banner Alert */}
+      {(duplicateError || hasDuplicatePhotos) && (
+        <div className="bg-rose-950/90 border border-rose-500 text-rose-200 p-4 rounded-xl flex items-center gap-3 text-xs font-bold shadow-lg animate-pulse">
+          <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+          <span>
+            {duplicateError || '⚠️ Duplicate Images Detected: All 3 photos must be distinct. You cannot upload the exact same image for multiple entries.'}
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#D4AF37]/30 pb-4">
         <div>
