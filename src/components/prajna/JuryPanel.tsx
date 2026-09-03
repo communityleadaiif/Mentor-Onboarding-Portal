@@ -3,7 +3,7 @@ import type { FullSubmission } from '../../types/prajna';
 import { EvaluationSheet } from './EvaluationSheet';
 import { SDGS_DATA } from '../../data/sdgs';
 import {
-  ShieldCheck, Lock, Star, CheckCircle, Trophy, CheckCircle2,
+  ShieldCheck, Lock, Star, CheckCircle, Trophy,
   FileText, Eye, Maximize2, X, BookOpen,
   Sparkles, Building2, MapPin, Users, HelpCircle
 } from 'lucide-react';
@@ -154,47 +154,25 @@ export const JuryPanel: React.FC<JuryPanelProps> = ({ userSubmissions }) => {
         <>
           {/* Public Leaderboard View */}
           {viewMode === 'leaderboard' && (
-            <div className="bg-[#2A0000] border-2 border-[#D4AF37]/40 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xl">
-              <div className="flex items-center justify-between border-b border-[#D4AF37]/30 pb-4">
-                <div className="flex items-center gap-2">
-                  <Star className="w-5 h-5 text-[#FFD700]" />
-                  <h3 className="text-lg font-bold text-white font-serif">Selected Finalist Projects</h3>
-                </div>
-                <span className="text-xs text-amber-200 font-bold bg-[#1F0000] px-3 py-1 rounded-full border border-[#D4AF37]/30">
-                  {allSubmissions.length} Projects Shortlisted
+            <div className="bg-[#2A0000] border-2 border-[#D4AF37]/40 rounded-2xl p-8 sm:p-12 text-center space-y-6 shadow-xl">
+              <div className="w-16 h-16 bg-[#8B0000] text-[#FFD700] rounded-full flex items-center justify-center mx-auto border border-[#D4AF37]/50 shadow-lg">
+                <Trophy className="w-8 h-8" />
+              </div>
+              <div className="space-y-2 max-w-lg mx-auto">
+                <span className="bg-[#8B0000] text-[#FFD700] text-xs font-bold px-3 py-1 rounded-full border border-[#D4AF37]/40 uppercase tracking-wider">
+                  Evaluation Stage — Opening Tomorrow
                 </span>
+                <h3 className="text-2xl font-bold font-serif text-white pt-1">
+                  Official Finalist Shortlist & Leaderboard
+                </h3>
+                <p className="text-xs text-amber-100/80 leading-relaxed">
+                  Participating school submissions are currently being audited by the Organiser desk for field photo evidence and originality. The live public leaderboard will be published tomorrow following pre-screening!
+                </p>
               </div>
 
-              <div className="space-y-4">
-                {allSubmissions.map((sub, idx) => (
-                  <div
-                    key={sub.id}
-                    className="bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-md hover:border-[#FFD700] transition"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-[#D4AF37] to-[#B8860B] text-[#2A0000] font-black rounded-xl flex items-center justify-center text-sm shadow shrink-0">
-                        #{idx + 1}
-                      </div>
-
-                      <div className="space-y-1">
-                        <span className="bg-[#8B0000] text-[#FFD700] text-[10px] font-extrabold px-2 py-0.5 rounded uppercase">
-                          {sub.team.schoolName} ({sub.problem.district})
-                        </span>
-                        <h4 className="font-extrabold text-white text-base font-serif">{sub.problem.problemTitle}</h4>
-                        <p className="text-xs text-amber-200/70">
-                          Team: <strong className="text-white">{sub.team.teamName}</strong> • Lead: {sub.team.teamLeadName}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="inline-flex items-center gap-1 bg-emerald-950 text-emerald-300 text-xs font-bold px-3 py-1 rounded-full border border-emerald-500/40">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Pre-Screening Verified
-                      </span>
-                    </div>
-                  </div>
-                ))}
+              <div className="inline-flex items-center gap-2 bg-[#1F0000] border border-[#D4AF37]/30 px-4 py-2 rounded-xl text-xs text-amber-200">
+                <Star className="w-4 h-4 text-[#FFD700]" />
+                <span>Track submitted teams in the <strong>Home Page Queue</strong></span>
               </div>
             </div>
           )}
