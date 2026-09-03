@@ -102,22 +102,38 @@ export const addCloudSubmission = async (newSubmission: FullSubmission): Promise
       }
     };
 
-    // Get current local and cloud list
-    let localCurrent: FullSubmission[] = [];
+    // 1. Fetch current live list from cloud so we never overwrite other teams
+    let existingList: FullSubmission[] = [];
     try {
-      const local = localStorage.getItem('prajna_2026_user_submissions');
-      localCurrent = local ? JSON.parse(local) : [];
-    } catch (e) {}
+      const cloudList = await fetchCloudSubmissions();
+      if (Array.isArray(cloudList) && cloudList.length > 0) {
+        existingList = cloudList;
+      }
+    } catch (e) {
+      console.warn('Could not fetch cloud before adding, using local fallback:', e);
+    }
 
-    const updatedList = [submissionWithGate, ...localCurrent.filter(s => s && s.id !== newSubmission.id)];
+    // 2. Fallback to local storage if cloud fetch was empty
+    if (existingList.length === 0) {
+      try {
+        const local = localStorage.getItem('prajna_2026_user_submissions');
+        if (local) existingList = JSON.parse(local);
+      } catch (e) {}
+    }
+
+    // 3. Merge new submission into full list
+    const updatedList = [
+      submissionWithGate,
+      ...existingList.filter(s => s && s.id && s.id !== newSubmission.id)
+    ];
+
+    // 4. Save to local storage cache immediately
     localStorage.setItem('prajna_2026_user_submissions', JSON.stringify(updatedList));
 
-    // Send update to Google Apps Script cloud database
+    // 5. Send merged full database update to Google Apps Script
     await saveCloudSubmissions(updatedList);
 
-    // Fetch live list to synchronize
-    const liveList = await fetchCloudSubmissions();
-    return liveList.length > 0 ? liveList : updatedList;
+    return updatedList;
   } catch (err) {
     console.error('Error adding submission to cloud:', err);
     return [newSubmission];
