@@ -823,21 +823,17 @@ function uploadPhotoToDrive(data) {
       return { status: "error", message: "Missing base64Data, submissionId, or photoType." };
     }
     
-    var targetFolder = DriveApp.getFolderById(PHOTO_BACKUP_FOLDER_ID);
-    
-    var subFolderName = "PRAJNA_Submissions";
-    var subFolders = targetFolder.getFoldersByName(subFolderName);
-    var subFolder;
-    if (subFolders.hasNext()) {
-      subFolder = subFolders.next();
-    } else {
-      subFolder = targetFolder.createFolder(subFolderName);
-    }
-    
     var decoded = Utilities.base64Decode(data.base64Data);
     var fileName = data.submissionId + "_" + data.photoType + ".jpg";
     var blob = Utilities.newBlob(decoded, "image/jpeg", fileName);
-    var file = subFolder.createFile(blob);
+    
+    // Create file in root Drive, then move it into the backup folder.
+    // This avoids createFolder/createFile-on-folder which needs a broader scope.
+    var targetFolder = DriveApp.getFolderById(PHOTO_BACKUP_FOLDER_ID);
+    var file = DriveApp.createFile(blob);
+    targetFolder.addFile(file);
+    try { DriveApp.getRootFolder().removeFile(file); } catch(e) {}
+    
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
     var shareUrl = "https://drive.google.com/file/d/" + file.getId() + "/view?usp=sharing";
