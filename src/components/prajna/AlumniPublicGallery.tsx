@@ -12,8 +12,8 @@ export const AlumniPublicGallery: React.FC<AlumniPublicGalleryProps> = ({
   userSubmissions,
   onSelectSubmissionForView
 }) => {
-  // Only display entries approved & verified by Organiser
-  const allSubmissions = userSubmissions.filter(s => s.auditInfo?.status === 'VERIFIED');
+  const allSubmissions = userSubmissions.filter(s => s && s.id && s.team && s.problem);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'VERIFIED'>('ALL');
   const [selectedDistrict, setSelectedDistrict] = useState<string>('All');
   const [votes, setVotes] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {};
@@ -34,9 +34,13 @@ export const AlumniPublicGallery: React.FC<AlumniPublicGalleryProps> = ({
   };
 
   const filteredSubmissions = allSubmissions.filter(s => {
+    if (statusFilter === 'VERIFIED' && s.auditInfo?.status !== 'VERIFIED') return false;
     if (selectedDistrict === 'All') return true;
-    return s.problem.district === selectedDistrict;
+    const d = s.problem?.district || s.team?.schoolDistrict;
+    return d === selectedDistrict;
   });
+
+  const verifiedCount = allSubmissions.filter(s => s.auditInfo?.status === 'VERIFIED').length;
 
   return (
     <div className="max-w-6xl mx-auto py-12 px-4 sm:px-6 space-y-10 text-white">
@@ -61,22 +65,45 @@ export const AlumniPublicGallery: React.FC<AlumniPublicGalleryProps> = ({
       </div>
 
       {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#2A0000] border border-[#D4AF37]/40 p-4 rounded-xl shadow-lg">
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-[#FFD700]" />
-          <span className="text-xs font-bold text-white uppercase tracking-wider">Filter By District:</span>
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-[#2A0000] border border-[#D4AF37]/40 p-4 rounded-xl shadow-lg">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setStatusFilter('ALL')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              statusFilter === 'ALL'
+                ? 'bg-[#8B0000] text-[#FFD700] border border-[#D4AF37]'
+                : 'bg-[#1F0000] text-amber-200/70 hover:text-white'
+            }`}
+          >
+            All Submissions ({allSubmissions.length})
+          </button>
+          <button
+            onClick={() => setStatusFilter('VERIFIED')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+              statusFilter === 'VERIFIED'
+                ? 'bg-emerald-900 text-emerald-200 border border-emerald-500/50'
+                : 'bg-[#1F0000] text-emerald-400/80 hover:text-emerald-300'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Verified Finalists ({verifiedCount})</span>
+          </button>
         </div>
 
-        <select
-          value={selectedDistrict}
-          onChange={(e) => setSelectedDistrict(e.target.value)}
-          className="bg-[#1F0000] text-white border border-[#D4AF37]/40 rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none"
-        >
-          <option value="All">All Tamil Nadu Districts ({allSubmissions.length} Submissions)</option>
-          {Array.from(new Set(allSubmissions.map(s => s.problem.district))).map(d => (
-            <option key={d} value={d}>{d}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          <Filter className="w-4 h-4 text-[#FFD700] shrink-0" />
+          <span className="text-xs font-bold text-white uppercase tracking-wider shrink-0">District:</span>
+          <select
+            value={selectedDistrict}
+            onChange={(e) => setSelectedDistrict(e.target.value)}
+            className="bg-[#1F0000] text-white border border-[#D4AF37]/40 rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none"
+          >
+            <option value="All">All Tamil Nadu Districts ({allSubmissions.length} Submissions)</option>
+            {Array.from(new Set(allSubmissions.map(s => s.problem.district || s.team?.schoolDistrict).filter(Boolean))).map(d => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Main Submissions Showcase Grid */}
@@ -85,9 +112,9 @@ export const AlumniPublicGallery: React.FC<AlumniPublicGalleryProps> = ({
           <div className="w-16 h-16 bg-[#8B0000] text-[#FFD700] rounded-full flex items-center justify-center mx-auto border border-[#D4AF37]/50 shadow-lg">
             <Sparkles className="w-8 h-8" />
           </div>
-          <h3 className="text-xl font-bold font-serif text-white">No Live Submissions In This Selection</h3>
+          <h3 className="text-xl font-bold font-serif text-white">No Submissions In This Selection</h3>
           <p className="text-xs text-amber-100/70 max-w-md mx-auto leading-relaxed">
-            School teams are currently submitting their geotagged community innovation proposals. Registered proposals will appear here live!
+            School teams are submitting their geotagged community innovation proposals. Check back or select another filter!
           </p>
         </div>
       ) : (
@@ -95,6 +122,7 @@ export const AlumniPublicGallery: React.FC<AlumniPublicGalleryProps> = ({
           {filteredSubmissions.map((sub) => {
             const voteCount = votes[sub.id] || 0;
             const voted = hasVoted[sub.id];
+            const isVerified = sub.auditInfo?.status === 'VERIFIED';
 
             return (
               <div
@@ -107,10 +135,17 @@ export const AlumniPublicGallery: React.FC<AlumniPublicGalleryProps> = ({
                     <span className="font-mono text-xs font-bold text-[#FFD700] bg-[#1F0000] px-2.5 py-0.5 rounded border border-[#D4AF37]/30">
                       {sub.id}
                     </span>
-                    <span className="inline-flex items-center gap-1 bg-emerald-950 text-emerald-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/40 uppercase">
-                      <ShieldCheck className="w-3 h-3" />
-                      Audited & Qualified
-                    </span>
+                    {isVerified ? (
+                      <span className="inline-flex items-center gap-1 bg-emerald-950 text-emerald-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/40 uppercase">
+                        <ShieldCheck className="w-3 h-3" />
+                        Verified Finalist
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 bg-amber-950 text-amber-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-500/40 uppercase">
+                        <Sparkles className="w-3 h-3" />
+                        Registration Queue
+                      </span>
+                    )}
                   </div>
 
                   {/* School & Team Info */}

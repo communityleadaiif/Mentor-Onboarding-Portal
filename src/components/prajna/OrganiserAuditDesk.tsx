@@ -35,6 +35,15 @@ export const OrganiserAuditDesk: React.FC<OrganiserAuditDeskProps> = ({
 
   const allSubmissions = (userSubmissions || []).filter(s => s && s.id && s.team && s.problem);
   const pendingCount = allSubmissions.filter(s => (s.auditInfo?.status || 'PENDING_APPROVAL') === 'PENDING_APPROVAL').length;
+  const verifiedCount = allSubmissions.filter(s => s.auditInfo?.status === 'VERIFIED').length;
+  const revisionCount = allSubmissions.filter(s => s.auditInfo?.status === 'REVISION_REQUESTED').length;
+
+  // Auto-refresh from cloud on mount when authenticated
+  React.useEffect(() => {
+    if (isAuthenticated && onRefreshCloud) {
+      onRefreshCloud();
+    }
+  }, [isAuthenticated]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +61,7 @@ export const OrganiserAuditDesk: React.FC<OrganiserAuditDeskProps> = ({
         console.warn('SessionStorage warning:', e);
       }
       setIsAuthenticated(true);
+      if (onRefreshCloud) onRefreshCloud();
     } else {
       alert('Invalid Organiser Passcode. Please contact Team Prajna Secretariat.');
     }
@@ -91,14 +101,27 @@ export const OrganiserAuditDesk: React.FC<OrganiserAuditDeskProps> = ({
     if (!sub || !sub.id) return false;
     const teamName = sub.team?.teamName || '';
     const schoolName = sub.team?.schoolName || '';
+    const schoolDistrict = sub.team?.schoolDistrict || sub.problem?.district || '';
+    const teamLeadName = sub.team?.teamLeadName || '';
+    const teamLeadPhone = sub.team?.teamLeadPhone || '';
+    const guideTeacherName = sub.team?.guideTeacherName || '';
     const problemTitle = sub.problem?.problemTitle || '';
+    const problemLocation = sub.problem?.problemLocation || '';
+    const responsibleDept = sub.problem?.responsibleDept || '';
     const id = sub.id || '';
 
-    const q = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
     const textMatch =
+      !q ||
       teamName.toLowerCase().includes(q) ||
       schoolName.toLowerCase().includes(q) ||
+      schoolDistrict.toLowerCase().includes(q) ||
+      teamLeadName.toLowerCase().includes(q) ||
+      teamLeadPhone.includes(q) ||
+      guideTeacherName.toLowerCase().includes(q) ||
       problemTitle.toLowerCase().includes(q) ||
+      problemLocation.toLowerCase().includes(q) ||
+      responsibleDept.toLowerCase().includes(q) ||
       id.toLowerCase().includes(q);
 
     if (!textMatch) return false;
@@ -247,7 +270,7 @@ export const OrganiserAuditDesk: React.FC<OrganiserAuditDeskProps> = ({
               filterStatus === 'VERIFIED' ? 'bg-emerald-800 text-emerald-200' : 'bg-[#2A0000] text-emerald-400'
             }`}
           >
-            Published to Public
+            Published to Public ({verifiedCount})
           </button>
 
           <button
@@ -256,7 +279,7 @@ export const OrganiserAuditDesk: React.FC<OrganiserAuditDeskProps> = ({
               filterStatus === 'REVISION_REQUESTED' ? 'bg-amber-800 text-amber-200' : 'bg-[#2A0000] text-amber-400'
             }`}
           >
-            Revision Requested
+            Revision Requested ({revisionCount})
           </button>
         </div>
       </div>

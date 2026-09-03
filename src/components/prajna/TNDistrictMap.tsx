@@ -17,18 +17,21 @@ const TN_REGIONS = [
 ];
 
 export const TNDistrictMap: React.FC<TNDistrictMapProps> = ({ userSubmissions, onSelectSubmission }) => {
-  // Only display pins approved & verified by Organiser
-  const allSubmissions = userSubmissions.filter(s => s.auditInfo?.status === 'VERIFIED');
+  // Display all valid registered submissions
+  const allSubmissions = userSubmissions.filter(s => s && s.id && s.team && s.problem);
   const [activeDistrict, setActiveDistrict] = useState<string>('Tiruppur');
 
   // Count submissions per district
   const districtCounts: Record<string, number> = {};
   allSubmissions.forEach(sub => {
-    const d = sub.problem.district || 'Tiruppur';
+    const d = sub.problem?.district || sub.team?.schoolDistrict || 'Tiruppur';
     districtCounts[d] = (districtCounts[d] || 0) + 1;
   });
 
-  const submissionsInActiveDistrict = allSubmissions.filter(s => s.problem.district === activeDistrict);
+  const submissionsInActiveDistrict = allSubmissions.filter(s => {
+    const d = s.problem?.district || s.team?.schoolDistrict;
+    return d === activeDistrict;
+  });
 
   return (
     <div className="max-w-6xl mx-auto py-12 px-4 sm:px-6 space-y-10 text-white">
@@ -126,7 +129,18 @@ export const TNDistrictMap: React.FC<TNDistrictMapProps> = ({ userSubmissions, o
                   className="bg-[#1F0000] border border-[#D4AF37]/30 rounded-xl p-4 space-y-3 hover:border-[#FFD700] transition shadow-md"
                 >
                   <div className="flex items-center justify-between border-b border-[#D4AF37]/20 pb-2">
-                    <span className="font-mono text-xs font-bold text-[#FFD700]">{sub.id}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-[#FFD700]">{sub.id}</span>
+                      {sub.auditInfo?.status === 'VERIFIED' ? (
+                        <span className="bg-emerald-950 text-emerald-300 text-[9px] font-bold px-1.5 py-0.5 rounded border border-emerald-500/40">
+                          Verified
+                        </span>
+                      ) : (
+                        <span className="bg-amber-950 text-amber-300 text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-500/40">
+                          Submitted Queue
+                        </span>
+                      )}
+                    </div>
                     <span className="text-xs text-amber-200/70 font-semibold">{sub.problem.responsibleDept}</span>
                   </div>
 

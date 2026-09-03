@@ -24,8 +24,15 @@ export const JuryPanel: React.FC<JuryPanelProps> = ({ userSubmissions }) => {
   const [passcode, setPasscode] = useState<string>('');
   const [passcodeError, setPasscodeError] = useState<boolean>(false);
 
-  const allSubmissions = userSubmissions.filter(s => s.auditInfo?.status === 'VERIFIED');
+  const allSubmissions = userSubmissions.filter(s => s && s.id && s.team && s.problem);
   const [selectedSub, setSelectedSub] = useState<FullSubmission | null>(allSubmissions.length > 0 ? allSubmissions[0] : null);
+
+  // Auto-select first item if selectedSub is null but items exist
+  React.useEffect(() => {
+    if (!selectedSub && allSubmissions.length > 0) {
+      setSelectedSub(allSubmissions[0]);
+    }
+  }, [allSubmissions.length]);
 
   // Jury View & Modal Controls
   const [activeJuryTab, setActiveJuryTab] = useState<'combined' | 'dossier' | 'scoring'>('combined');

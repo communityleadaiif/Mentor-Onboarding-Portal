@@ -4,9 +4,10 @@ const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbyj_EuwoOtaZkJ4E1
 
 export const fetchCloudSubmissions = async (): Promise<FullSubmission[]> => {
   try {
-    const res = await fetch(CLOUD_API_URL, {
+    const res = await fetch(`${CLOUD_API_URL}?_t=${Date.now()}`, {
       method: 'GET',
       redirect: 'follow',
+      cache: 'no-store',
       headers: {
         'Accept': 'application/json'
       }
@@ -34,9 +35,26 @@ export const fetchCloudSubmissions = async (): Promise<FullSubmission[]> => {
       typeof s.problem === 'object';
     const cleanCloudList = cloudList.filter(isValidSubmission);
 
-    // Synchronize local storage cache to match canonical cloud database
-    localStorage.setItem('prajna_2026_user_submissions', JSON.stringify(cleanCloudList));
-    return cleanCloudList;
+    // Merge with local storage cache to ensure zero loss if any newly submitted item hasn't synced yet
+    let mergedList = [...cleanCloudList];
+    try {
+      const local = localStorage.getItem('prajna_2026_user_submissions');
+      if (local) {
+        const localList: FullSubmission[] = JSON.parse(local);
+        if (Array.isArray(localList)) {
+          const cloudIds = new Set(cleanCloudList.map(c => c.id));
+          localList.forEach(loc => {
+            if (loc && loc.id && !cloudIds.has(loc.id) && isValidSubmission(loc)) {
+              mergedList.push(loc);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+
+    // Synchronize local storage cache to match canonical database
+    localStorage.setItem('prajna_2026_user_submissions', JSON.stringify(mergedList));
+    return mergedList;
   } catch (err) {
     console.warn('Cloud API fetch warning (using local fallback):', err);
     try {
@@ -75,8 +93,6 @@ export const saveCloudSubmissions = async (submissions: FullSubmission[]): Promi
 
 export const addCloudSubmission = async (newSubmission: FullSubmission): Promise<FullSubmission[]> => {
   try {
-    const currentList = await fetchCloudSubmissions();
-
     // Ensure default status is PENDING_APPROVAL for organiser pre-screening gate
     const submissionWithGate: FullSubmission = {
       ...newSubmission,
@@ -86,9 +102,22 @@ export const addCloudSubmission = async (newSubmission: FullSubmission): Promise
       }
     };
 
-    const updatedList = [submissionWithGate, ...currentList.filter(s => s.id !== newSubmission.id)];
+    // Get current local and cloud list
+    let localCurrent: FullSubmission[] = [];
+    try {
+      const local = localStorage.getItem('prajna_2026_user_submissions');
+      localCurrent = local ? JSON.parse(local) : [];
+    } catch (e) {}
+
+    const updatedList = [submissionWithGate, ...localCurrent.filter(s => s && s.id !== newSubmission.id)];
+    localStorage.setItem('prajna_2026_user_submissions', JSON.stringify(updatedList));
+
+    // Send update to Google Apps Script cloud database
     await saveCloudSubmissions(updatedList);
-    return updatedList;
+
+    // Fetch live list to synchronize
+    const liveList = await fetchCloudSubmissions();
+    return liveList.length > 0 ? liveList : updatedList;
   } catch (err) {
     console.error('Error adding submission to cloud:', err);
     return [newSubmission];

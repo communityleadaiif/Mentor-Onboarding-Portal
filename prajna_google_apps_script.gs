@@ -214,8 +214,34 @@ function doPost(e) {
     // Trigger automated background notifications ONLY for non-blacklisted valid entries
     processAutomatedNotifications(validSubmissionsList, existingSubmissions);
 
-    // Save updated JSON list to Google Drive
-    var outputJson = JSON.stringify(validSubmissionsList);
+    // Merge incoming submissions with existing submissions (newer entries take precedence, existing entries preserved)
+    var mergedMap = {};
+    var finalMergedList = [];
+    
+    // 1. Add incoming updated submissions
+    for (var i = 0; i < validSubmissionsList.length; i++) {
+      var sub = validSubmissionsList[i];
+      if (sub && sub.id && deletedIds.indexOf(String(sub.id)) === -1) {
+        var subIdStr = String(sub.id);
+        mergedMap[subIdStr] = sub;
+        finalMergedList.push(sub);
+      }
+    }
+    
+    // 2. Append any existing submissions that were not in incoming payload and not deleted
+    for (var j = 0; j < existingSubmissions.length; j++) {
+      var ex = existingSubmissions[j];
+      if (ex && ex.id) {
+        var exIdStr = String(ex.id);
+        if (!mergedMap[exIdStr] && deletedIds.indexOf(exIdStr) === -1) {
+          mergedMap[exIdStr] = ex;
+          finalMergedList.push(ex);
+        }
+      }
+    }
+
+    // Save updated merged JSON list to Google Drive
+    var outputJson = JSON.stringify(finalMergedList);
     if (file) {
       file.setContent(outputJson);
     } else {
@@ -224,11 +250,11 @@ function doPost(e) {
     }
     
     // Sync structured rows to Google Sheet (Excel Spreadsheet Report)
-    syncSubmissionsToGoogleSheet(validSubmissionsList);
+    syncSubmissionsToGoogleSheet(finalMergedList);
 
     return ContentService.createTextOutput(JSON.stringify({ 
       status: "success", 
-      count: validSubmissionsList.length 
+      count: finalMergedList.length 
     }))
     .setMimeType(ContentService.MimeType.JSON);
   } catch (error) {

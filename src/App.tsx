@@ -47,7 +47,7 @@ function App() {
 
   const [userSubmittedList, setUserSubmittedList] = useState<FullSubmission[]>([]);
 
-  // Real-time Cloud Database Synchronization
+  // Real-time Cloud Database Synchronization & Auto-Polling
   useEffect(() => {
     // Initial fetch on site load
     fetchCloudSubmissions().then(list => {
@@ -56,15 +56,31 @@ function App() {
       }
     });
 
-    // Auto-sync every 5 seconds for real-time Organiser updates
+    // Fast auto-sync interval for real-time Organiser & Queue updates
     const interval = setInterval(async () => {
       const list = await fetchCloudSubmissions();
       if (list && Array.isArray(list)) {
         setUserSubmittedList(list);
       }
-    }, 5000);
+    }, 4000);
 
-    return () => clearInterval(interval);
+    // Auto-sync whenever user focuses or switches back to tab
+    const handleFocusOrVisible = async () => {
+      const list = await fetchCloudSubmissions();
+      if (list && Array.isArray(list)) {
+        setUserSubmittedList(list);
+      }
+    };
+
+    window.addEventListener('focus', handleFocusOrVisible);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) handleFocusOrVisible();
+    });
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocusOrVisible);
+    };
   }, []);
 
   const handleRefreshCloud = async () => {
@@ -84,23 +100,26 @@ function App() {
     }
   }, []);
 
-  // Update school marquee list dynamically from approved (VERIFIED) submissions strictly from cloud sheet
+  // Update school marquee list dynamically from ALL registered/submitted teams in the queue (without waiting for organiser approval!)
   useEffect(() => {
-    const verifiedSubs = userSubmittedList.filter(s => s.auditInfo?.status === 'VERIFIED');
-    
-    // Map verified submissions to school entries
-    const verifiedSchoolEntries: SchoolEntry[] = verifiedSubs
-      .filter(s => Boolean(s.team && s.team.schoolName))
-      .map((s, idx) => ({
-        id: `verified-sch-${s.id}-${idx}`,
-        name: s.team.schoolName,
-        district: s.team.schoolDistrict || 'Tamil Nadu',
-        badgeSymbol: '🎓',
-        category: 'Approved Finalist School'
-      }));
+    const submittedTeamEntries: SchoolEntry[] = userSubmittedList
+      .filter(s => s && s.team && (s.team.teamName || s.team.schoolName))
+      .map((s, idx) => {
+        const isVerified = s.auditInfo?.status === 'VERIFIED';
+        return {
+          id: `team-queue-${s.id || idx}`,
+          name: s.team.schoolName || 'Tamil Nadu School',
+          teamName: s.team.teamName || 'Innovation Team',
+          district: s.team.schoolDistrict || s.problem?.district || 'Tamil Nadu',
+          badgeSymbol: isVerified ? '🏆' : '🚀',
+          category: isVerified ? 'Verified Finalist' : 'Submitted Team (Queue)',
+          status: s.auditInfo?.status || 'PENDING_APPROVAL',
+          submissionId: s.id
+        };
+      });
 
     // Merge with initial partner schools without duplicates
-    const combined = [...verifiedSchoolEntries];
+    const combined = [...submittedTeamEntries];
     INITIAL_SCHOOLS.forEach(initSch => {
       const exists = combined.some(c => c.name.toLowerCase() === initSch.name.toLowerCase());
       if (!exists) {
@@ -121,6 +140,10 @@ function App() {
     };
 
     setCurrentSubmission(gatedSubmission);
+    // Optimistically update list so it instantly appears in organiser desk & queue
+    setUserSubmittedList(prev => [gatedSubmission, ...prev.filter(s => s.id !== gatedSubmission.id)]);
+    
+    // Send to cloud database
     const updatedList = await addCloudSubmission(gatedSubmission);
     setUserSubmittedList(updatedList);
     setActiveTab('scorecard');
