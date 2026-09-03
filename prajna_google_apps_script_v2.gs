@@ -229,8 +229,23 @@ function doPost(e) {
       }
     }
     
+    // v2: LIST BACKUP FILES IN THE BACKUP FOLDER (identify duplicates)
+    if (parsed && parsed.action === "list_backup_files") {
+      var listResult = listBackupFiles();
+      return ContentService.createTextOutput(JSON.stringify(listResult))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // v2: DELETE A SPECIFIC FILE BY ID (clean up duplicates)
+    if (parsed && parsed.action === "delete_backup_file") {
+      var delResult = deleteBackupFile(parsed.fileId || parsed.id || "");
+      return ContentService.createTextOutput(JSON.stringify(delResult))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
     // ==================== END v2 ACTIONS ====================
-        // ACTION 3: STANDARD PAYLOAD SUBMISSION / SYNC
+    
+    // ACTION 3: STANDARD PAYLOAD SUBMISSION / SYNC
     // v2: Auto-backup before any standard sync write
     snapshotDatabase(folder, "PRE-SYNC");
     var newSubmissionsList = [];
@@ -956,4 +971,39 @@ function saveOrganiserToken(folder, token) {
       f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     }
   } catch(e) {}
+}
+
+// List all files in the backup folder (to identify duplicates)
+function listBackupFiles() {
+  try {
+    var targetFolder = DriveApp.getFolderById(PHOTO_BACKUP_FOLDER_ID);
+    var files = targetFolder.getFiles();
+    var out = [];
+    while (files.hasNext()) {
+      var f = files.next();
+      out.push({
+        id: f.getId(),
+        name: f.getName(),
+        type: f.getMimeType(),
+        size: f.getSize(),
+        lastUpdated: f.getLastUpdated() ? f.getLastUpdated().toISOString() : ""
+      });
+    }
+    return { status: "success", folderId: PHOTO_BACKUP_FOLDER_ID, count: out.length, files: out };
+  } catch (err) {
+    return { status: "error", message: err.toString() };
+  }
+}
+
+// Delete a specific file by ID (clean up duplicates) - wraps in try/catch
+function deleteBackupFile(fileId) {
+  try {
+    if (!fileId) return { status: "error", message: "Missing fileId." };
+    var file = DriveApp.getFileById(fileId);
+    var name = file.getName();
+    file.setTrashed(true);
+    return { status: "success", deletedId: fileId, name: name };
+  } catch (err) {
+    return { status: "error", message: err.toString() };
+  }
 }
