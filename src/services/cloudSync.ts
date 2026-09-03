@@ -1,6 +1,6 @@
 import type { FullSubmission, AuditStatus } from '../types/prajna';
 
-const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbyj_EuwoOtaZkJ4E1PEylxsx8yTtuRJZm0r1_CNC3tyY4tKZk47I5ZuhNccEyS2Auqv/exec';
+const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxcLosT07HPlscp4ujElweLopSAfyg90rz5BaFaV10TBpIFF8B9AP41j29jpwQQO1e0/exec';
 
 export const fetchCloudSubmissions = async (): Promise<FullSubmission[]> => {
   try {
