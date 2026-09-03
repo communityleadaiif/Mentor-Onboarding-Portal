@@ -49,37 +49,47 @@ function App() {
 
   // Real-time Cloud Database Synchronization & Auto-Polling
   useEffect(() => {
-    // Initial fetch on site load
-    fetchCloudSubmissions().then(list => {
-      if (list && Array.isArray(list)) {
-        setUserSubmittedList(list);
-      }
-    });
+    let inFlight = false;
 
-    // Fast auto-sync interval for real-time Organiser & Queue updates
-    const interval = setInterval(async () => {
-      const list = await fetchCloudSubmissions();
-      if (list && Array.isArray(list)) {
-        setUserSubmittedList(list);
+    const syncData = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const list = await fetchCloudSubmissions();
+        if (list && Array.isArray(list) && list.length > 0) {
+          setUserSubmittedList(list);
+        }
+      } catch (e) {
+        console.error('Auto-sync error:', e);
+      } finally {
+        inFlight = false;
       }
-    }, 4000);
+    };
 
-    // Auto-sync whenever user focuses or switches back to tab
-    const handleFocusOrVisible = async () => {
-      const list = await fetchCloudSubmissions();
-      if (list && Array.isArray(list)) {
-        setUserSubmittedList(list);
+    // Initial load
+    syncData();
+
+    // Smooth periodic background refresh (every 15s when active tab is open)
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        syncData();
+      }
+    }, 15000);
+
+    // Immediate sync on window focus / visibility change
+    const handleFocusOrVisible = () => {
+      if (!document.hidden) {
+        syncData();
       }
     };
 
     window.addEventListener('focus', handleFocusOrVisible);
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) handleFocusOrVisible();
-    });
+    document.addEventListener('visibilitychange', handleFocusOrVisible);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocusOrVisible);
+      document.removeEventListener('visibilitychange', handleFocusOrVisible);
     };
   }, []);
 
