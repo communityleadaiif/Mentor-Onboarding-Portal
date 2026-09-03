@@ -93,6 +93,7 @@ export const saveCloudSubmissions = async (submissions: FullSubmission[]): Promi
 
 export const addCloudSubmission = async (newSubmission: FullSubmission): Promise<FullSubmission[]> => {
   try {
+    await triggerDatabaseBackup('PRE-ADD');
     // Ensure default status is PENDING_APPROVAL for organiser pre-screening gate
     const submissionWithGate: FullSubmission = {
       ...newSubmission,
@@ -146,6 +147,7 @@ export const updateSubmissionAuditStatus = async (
   remark?: string
 ): Promise<FullSubmission[]> => {
   try {
+    await triggerDatabaseBackup('PRE-AUDIT');
     const currentList = await fetchCloudSubmissions();
     const updatedList = currentList.map(s => {
       if (s.id === submissionId) {
@@ -171,6 +173,7 @@ export const updateSubmissionAuditStatus = async (
 
 export const deleteSubmissionFromCloud = async (submissionId: string): Promise<FullSubmission[]> => {
   try {
+    await triggerDatabaseBackup('PRE-DELETE');
     let currentList = await fetchCloudSubmissions();
     const updatedList = currentList.filter(s => s.id !== submissionId);
 
@@ -199,6 +202,7 @@ export const deleteSubmissionFromCloud = async (submissionId: string): Promise<F
 
 export const clearAllCloudSubmissions = async (): Promise<boolean> => {
   try {
+    await triggerDatabaseBackup('PRE-CLEAR');
     localStorage.removeItem('prajna_2026_user_submissions');
     localStorage.removeItem('prajna_2026_draft');
 
@@ -217,5 +221,91 @@ export const clearAllCloudSubmissions = async (): Promise<boolean> => {
   } catch (err) {
     console.error('Error clearing cloud submissions:', err);
     return false;
+  }
+};
+
+// ==================== v2: VERSION HISTORY & PHOTO MANAGEMENT ====================
+
+export const triggerDatabaseBackup = async (label: string = 'PRE-WRITE'): Promise<void> => {
+  try {
+    await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'backup_database', label })
+    });
+  } catch (err) {
+    console.warn('Backup trigger failed (non-blocking):', err);
+  }
+};
+
+export const uploadPhotoToDrive = async (
+  submissionId: string,
+  photoType: 'closeUp' | 'wideAngle' | 'teamOnSite',
+  base64Data: string
+): Promise<{ status: string; url?: string; fileId?: string }> => {
+  try {
+    const res = await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'upload_photo', submissionId, photoType, base64Data })
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Photo upload failed:', err);
+    return { status: 'error' };
+  }
+};
+
+export const updateSheetPhotoLinks = async (
+  submissionId: string,
+  photoLinks: { closeUp?: string; wideAngle?: string; teamOnSite?: string }
+): Promise<{ status: string; message?: string }> => {
+  try {
+    const res = await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'update_sheet_photo_links', submissionId, photoLinks })
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Sheet photo link update failed:', err);
+    return { status: 'error' };
+  }
+};
+
+export const createBackupSpreadsheet = async (): Promise<{
+  status: string; url?: string; name?: string; rowsCopied?: number;
+}> => {
+  try {
+    const res = await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'create_backup_sheet' })
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Backup spreadsheet creation failed:', err);
+    return { status: 'error' };
+  }
+};
+
+export const authenticateOrganiser = async (
+  passcode: string
+): Promise<{ status: string; token?: string; message?: string }> => {
+  try {
+    const res = await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'authenticate_organiser', passcode })
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Organiser auth failed:', err);
+    return { status: 'error', message: 'Network error during authentication.' };
   }
 };

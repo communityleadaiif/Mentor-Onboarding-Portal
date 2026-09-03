@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { FullSubmission, AuditStatus } from '../../types/prajna';
+import { authenticateOrganiser } from '../../services/cloudSync';
 import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Search, Lock, RefreshCw, Eye, MessageSquare, Image, Copy, Trash2, RotateCcw } from 'lucide-react';
 
 interface OrganiserAuditDeskProps {
@@ -45,25 +46,28 @@ export const OrganiserAuditDesk: React.FC<OrganiserAuditDeskProps> = ({
     }
   }, [isAuthenticated]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanPasscode = passcode.trim().toUpperCase();
-    if (
-      cleanPasscode === 'ORGANISER2026' ||
-      cleanPasscode === 'PRAJNA2026' ||
-      cleanPasscode === 'ADMIN' ||
-      cleanPasscode === 'ORGANISER' ||
-      cleanPasscode === 'PRAJNA'
-    ) {
-      try {
-        sessionStorage.setItem('prajna_organiser_auth', 'true');
-      } catch (e) {
-        console.warn('SessionStorage warning:', e);
+    if (!passcode.trim()) {
+      alert('Please enter a passcode.');
+      return;
+    }
+    try {
+      const result = await authenticateOrganiser(passcode.trim());
+      if (result.status === 'success' && result.token) {
+        try {
+          sessionStorage.setItem('prajna_organiser_auth', 'true');
+          sessionStorage.setItem('prajna_organiser_token', result.token);
+        } catch (e) {
+          console.warn('SessionStorage warning:', e);
+        }
+        setIsAuthenticated(true);
+        if (onRefreshCloud) onRefreshCloud();
+      } else {
+        alert(result.message || 'Invalid Organiser Passcode. Please contact Team Prajna Secretariat.');
       }
-      setIsAuthenticated(true);
-      if (onRefreshCloud) onRefreshCloud();
-    } else {
-      alert('Invalid Organiser Passcode. Please contact Team Prajna Secretariat.');
+    } catch (err) {
+      alert('Network error during authentication. Please try again.');
     }
   };
 
